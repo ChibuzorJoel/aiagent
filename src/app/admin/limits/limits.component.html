@@ -1,0 +1,82 @@
+<section class="limits">
+
+  <header class="page-head">
+    <div>
+      <h1>Limits and Policies</h1>
+      <p>Control spending, message volume, blocked tools and how long conversations are kept.</p>
+    </div>
+  </header>
+
+  <div class="success" role="status" *ngIf="notice">{{ notice }}</div>
+  <div class="error" role="alert" *ngIf="error">
+    <span>{{ error }}</span>
+    <button type="button" class="btn small outline" (click)="load()" [disabled]="loading">Retry</button>
+  </div>
+
+  <!-- Skeleton -->
+  <div *ngIf="loading" aria-busy="true">
+    <div class="skel" *ngFor="let s of skeletons"></div>
+  </div>
+
+  <form *ngIf="!loading && !error && saved"
+        (submit)="save($event, capI.value, dailyI.value, retS.value)" novalidate>
+
+    <!-- Spending -->
+    <div class="card">
+      <h2>Monthly cost cap</h2>
+      <p class="desc">Agents stop answering when the total cost for the month reaches this amount.</p>
+
+      <label class="field" for="lmCap">Cap per month (USD)</label>
+      <input #capI id="lmCap" class="input" type="number" inputmode="decimal" min="1" step="0.01"
+             [value]="saved.monthlyCap" [disabled]="saving">
+      <div class="hint">Spent so far this month: ${{ monthCost | number: '1.2-2' }}</div>
+    </div>
+
+    <!-- Messages -->
+    <div class="card">
+      <h2>Daily message cap</h2>
+      <p class="desc">The most messages one person can send to agents in a day.</p>
+
+      <label class="field" for="lmDaily">Messages per person per day</label>
+      <input #dailyI id="lmDaily" class="input" type="number" inputmode="numeric" min="1" step="1"
+             [value]="saved.dailyMessages" [disabled]="saving">
+    </div>
+
+    <!-- Blocked tools -->
+    <div class="card">
+      <h2>Always blocked tools</h2>
+      <p class="desc">Agents can never use a ticked tool, even if a builder has added it to an agent.</p>
+
+      <div class="checks">
+        <label class="check" *ngFor="let t of tools; trackBy: trackByKey">
+          <input #c type="checkbox" [checked]="isBlocked(t.key)" [disabled]="saving"
+                 (change)="toggleBlocked(t.key, c.checked)">
+          <span class="check-text">
+            <strong>{{ t.name }}</strong>
+            <span class="check-desc">{{ t.desc }}</span>
+          </span>
+          <span class="tag" *ngIf="isBlocked(t.key)">✖ Blocked</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Retention -->
+    <div class="card">
+      <h2>Conversation retention</h2>
+      <p class="desc">Conversations older than this are removed automatically.</p>
+
+      <label class="field" for="lmRet">Keep conversations for</label>
+      <select #retS id="lmRet" class="input" [disabled]="saving">
+        <option *ngFor="let d of retentionOptions" [value]="d" [selected]="d === saved.retentionDays">{{ d }} days</option>
+      </select>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn outline" (click)="discard(capI, dailyI, retS)" [disabled]="saving">Discard changes</button>
+      <button type="submit" class="btn primary" [disabled]="saving">{{ saving ? 'Saving...' : 'Save changes' }}</button>
+    </div>
+
+    <div class="error" role="alert" *ngIf="formError">{{ formError }}</div>
+  </form>
+
+</section>

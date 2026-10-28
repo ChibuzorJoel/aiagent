@@ -1,0 +1,124 @@
+<section class="chat">
+  <!-- Top bar -->
+  <header class="chat-top">
+    <div class="agent-pick">
+      <span class="avatar" [style.background]="currentAgent.color">{{ currentAgent.name.charAt(0) }}</span>
+      <div class="pick-wrap">
+        <label class="tiny" for="agentSel">Agent</label>
+        <select id="agentSel" #agentSel class="select" [disabled]="busy || agents.length === 0" (change)="onAgentChange(agentSel.value)">
+          <option *ngFor="let a of agents" [value]="a.id" [selected]="a.id === agentId">{{ a.name }}</option>
+        </select>
+      </div>
+    </div>
+
+    <span class="chip">Knowledge: {{ currentAgent.knowledge }}</span>
+
+    <button class="btn outline small push" (click)="newChat()">+ New chat</button>
+  </header>
+
+  <!-- Messages -->
+  <div class="messages" #scroller aria-live="polite">
+    <!-- Empty state -->
+    <div class="empty" *ngIf="messages.length === 0 && !thinking">
+      <span class="avatar big" [style.background]="currentAgent.color">{{ currentAgent.name.charAt(0) }}</span>
+      <h2>Chat with {{ currentAgent.name }}</h2>
+      <p>{{ currentAgent.purpose }}</p>
+      <div class="prompts">
+        <button class="prompt" *ngFor="let p of suggestions" [disabled]="busy || limitReached || !agentId" (click)="sendText(p)">{{ p }}</button>
+      </div>
+    </div>
+
+    <!-- Conversation -->
+    <div class="msg" *ngFor="let m of messages; trackBy: trackById" [ngClass]="m.role">
+      <span class="avatar" *ngIf="m.role === 'agent'" [style.background]="currentAgent.color">{{ currentAgent.name.charAt(0) }}</span>
+
+      <div class="body">
+        <div class="bubble" [class.failed]="m.failed">
+          <span class="text">{{ m.text }}</span><span class="cursor" *ngIf="m.streaming"></span>
+
+          <div class="attached" *ngIf="m.files && m.files.length">
+            <span class="file-chip" *ngFor="let f of m.files">📎 {{ f }}</span>
+          </div>
+        </div>
+
+        <!-- Tool chips -->
+        <div class="tools" *ngIf="m.tools && m.tools.length">
+          <span class="tool-chip" *ngFor="let t of m.tools">Used: {{ t.name }} ({{ t.seconds | number: '1.1-1' }} s)</span>
+        </div>
+
+        <!-- Approval card -->
+        <div class="approval" *ngIf="m.approval" [ngClass]="m.approval.status">
+          <div class="approval-title">Approval needed</div>
+          <p class="approval-text">{{ m.approval.text }}</p>
+
+          <div class="approval-actions" *ngIf="m.approval.status === 'pending'">
+            <button class="btn small primary" [disabled]="m.approval.deciding" (click)="decide(m, true)">
+              {{ m.approval.deciding ? 'Working...' : 'Approve' }}
+            </button>
+            <button class="btn small danger" [disabled]="m.approval.deciding" (click)="decide(m, false)">Reject</button>
+          </div>
+          <div class="approval-state" *ngIf="m.approval.status !== 'pending'">
+            {{ m.approval.status === 'approved' ? '✔ Approved' : '✖ Rejected' }}
+          </div>
+        </div>
+
+        <!-- Failed -->
+        <div class="fail" *ngIf="m.failed">
+          <span>Something went wrong.</span>
+          <button class="btn small outline" (click)="retry()" [disabled]="busy">Retry</button>
+        </div>
+
+        <div class="time">{{ m.time | date: 'shortTime' }}</div>
+      </div>
+    </div>
+
+    <!-- Thinking -->
+    <div class="msg agent" *ngIf="thinking">
+      <span class="avatar" [style.background]="currentAgent.color">{{ currentAgent.name.charAt(0) }}</span>
+      <div class="body">
+        <div class="bubble dots" aria-label="The agent is thinking"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Problems opening things (agents, a conversation, a decision) -->
+  <div class="limit" role="alert" *ngIf="loadError">{{ loadError }}</div>
+
+  <!-- Limit reached -->
+  <div class="limit" role="alert" *ngIf="limitReached">
+    {{ limitMessage || 'You have reached your message limit.' }}
+    <a *ngIf="canSeeUsage" routerLink="/usage">See your usage</a>
+  </div>
+
+  <!-- Composer -->
+  <footer class="composer">
+    <div class="files" *ngIf="attachmentsEnabled && attachments.length">
+      <span class="file-chip" *ngFor="let f of attachments; let i = index">
+        📎 {{ f.name }}
+        <button type="button" class="x" (click)="removeFile(i)" aria-label="Remove file">&times;</button>
+      </span>
+    </div>
+    <div class="file-error" *ngIf="attachmentsEnabled && fileError">{{ fileError }}</div>
+
+    <div class="row">
+      <ng-container *ngIf="attachmentsEnabled">
+        <input #fileInput type="file" hidden multiple
+               accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+               (change)="onFiles(fileInput)">
+        <button type="button" class="icon-btn" aria-label="Attach files"
+                [disabled]="limitReached" (click)="fileInput.click()">📎</button>
+      </ng-container>
+
+      <textarea #composer class="box" rows="1"
+                placeholder="Type a message..."
+                aria-label="Message"
+                [disabled]="limitReached || !agentId"
+                (input)="onInput(composer)"
+                (keydown)="onKey($event)"></textarea>
+
+      <button *ngIf="!busy" type="button" class="btn primary send" [disabled]="!canSend" (click)="send()">Send</button>
+      <button *ngIf="busy" type="button" class="btn danger send" (click)="stop()">Stop</button>
+    </div>
+    <div class="hint">Enter to send &middot; Shift+Enter for a new line</div>
+  </footer>
+</section>

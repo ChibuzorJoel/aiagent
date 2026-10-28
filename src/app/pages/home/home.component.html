@@ -1,0 +1,100 @@
+
+<section class="home">
+  <!-- Header -->
+  <header class="page-head">
+    <div>
+      <h1>{{ greeting }}, {{ firstName }}</h1>
+      <p class="sub">{{ today | date: 'fullDate' }} &middot; Here is what is happening in your workspace.</p>
+    </div>
+    <button class="btn primary" (click)="newChat()">+ New chat</button>
+  </header>
+
+  <!-- Stat cards -->
+  <div class="stats">
+    <ng-container *ngIf="!loading; else statSkeleton">
+      <div class="stat" *ngFor="let s of visibleStats" (click)="go(s.route)" tabindex="0" (keydown.enter)="go(s.route)">
+        <div class="stat-ico" [ngClass]="s.tone">{{ s.icon }}</div>
+        <div>
+          <div class="stat-val">{{ s.value }}</div>
+          <div class="stat-lbl">{{ s.label }}</div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-template #statSkeleton>
+      <div class="stat skeleton" *ngFor="let n of [1, 2, 3, 4]"></div>
+    </ng-template>
+  </div>
+
+  <div class="layout">
+    <div class="main-col">
+      <!-- Continue where you left off -->
+      <div class="card">
+        <div class="card-head">
+          <h2>Continue where you left off</h2>
+          <a class="link" routerLink="/conversations">View all</a>
+        </div>
+
+        <div class="grid" *ngIf="!loading">
+          <button class="convo" *ngFor="let c of recentChats" (click)="openChat(c)">
+            <span class="avatar" [style.background]="c.color">{{ c.agent.charAt(0) }}</span>
+            <span class="convo-body">
+              <span class="convo-title">{{ c.title }}</span>
+              <span class="convo-meta">{{ c.agent }} &middot; {{ c.time }}</span>
+            </span>
+          </button>
+        </div>
+        <div class="grid" *ngIf="loading">
+          <div class="convo skeleton" *ngFor="let n of [1, 2, 3]"></div>
+        </div>
+
+        <div class="empty" *ngIf="!loading && recentChats.length === 0">
+          <p>No conversations yet.</p>
+          <button class="btn outline" (click)="newChat()">Start your first chat</button>
+        </div>
+      </div>
+
+      <!-- Try an agent -->
+      <div class="card">
+        <div class="card-head">
+          <h2>Try an agent</h2>
+        </div>
+
+        <div class="agents" *ngIf="!loading">
+          <div class="agent" *ngFor="let a of agents">
+            <div class="avatar big" [style.background]="a.color">{{ a.name.charAt(0) }}</div>
+            <div class="agent-name">{{ a.name }}</div>
+            <p class="agent-desc">{{ a.purpose }}</p>
+            <button class="btn small outline" (click)="openAgent(a)">Open</button>
+          </div>
+        </div>
+        <div class="agents" *ngIf="loading">
+          <div class="agent skeleton" *ngFor="let n of [1, 2, 3]"></div>
+        </div>
+
+        <div class="empty" *ngIf="!loading && agents.length === 0">
+          <p>No agents have been published yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Announcements -->
+    <aside class="side-col">
+      <div class="card">
+        <div class="card-head"><h2>Announcements</h2></div>
+
+        <ul class="news" *ngIf="!loading">
+          <li *ngFor="let n of announcements">
+            <div class="news-title">{{ n.title }}</div>
+            <div class="news-text">{{ n.text }}</div>
+            <div class="news-date">{{ n.date }}</div>
+          </li>
+        </ul>
+        <div class="skeleton line" *ngIf="loading"></div>
+
+        <div class="empty" *ngIf="!loading && announcements.length === 0">
+          <p>Nothing new right now.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>

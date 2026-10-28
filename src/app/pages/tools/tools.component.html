@@ -1,0 +1,94 @@
+
+
+<section class="tools">
+  <!-- Header -->
+  <header class="page-head">
+    <div>
+      <h1>Tools</h1>
+      <p class="sub">Connect the tools your agents can use, and test that they work.</p>
+    </div>
+    <span class="count-chip" *ngIf="canBuild && !loading">{{ connectedCount }} of {{ tools.length }} connected</span>
+  </header>
+
+  <!-- Not allowed -->
+  <div class="card gate" *ngIf="!canBuild">
+    <h2>Builders only</h2>
+    <p>Only builders and admins can manage tools. Ask an admin to change your role.</p>
+  </div>
+
+  <ng-container *ngIf="canBuild">
+    <!-- Loading -->
+    <div class="grid" *ngIf="loading">
+      <div class="skeleton" *ngFor="let n of [1, 2, 3, 4]"></div>
+    </div>
+
+    <!-- Cards -->
+    <div class="grid" *ngIf="!loading">
+      <article class="tool-card" *ngFor="let t of tools; trackBy: trackById" [class.on]="t.connected">
+        <div class="top">
+          <span class="ico">{{ t.icon }}</span>
+          <span class="conn" [ngClass]="t.connected ? 'on' : 'off'">
+            <i class="dot"></i>{{ t.connected ? 'Connected' : 'Not connected' }}
+          </span>
+        </div>
+
+        <h3>{{ t.name }}</h3>
+        <p class="desc">{{ t.description }}</p>
+
+        <ul class="can">
+          <li *ngFor="let a of t.abilities">{{ a }}</li>
+        </ul>
+
+        <div class="tags">
+          <span class="tag" [ngClass]="t.sideEffects ? 'warn' : 'safe'">
+            {{ t.sideEffects ? '⚠ Needs approval' : '✔ No approval needed' }}
+          </span>
+          <span class="tag neutral">Used by {{ plural(t.usedBy, 'agent') }}</span>
+        </div>
+
+        <!-- Last test result -->
+        <div class="result" *ngIf="t.lastTest as r" [ngClass]="r.ok ? 'pass' : 'fail'" role="status" aria-live="polite">
+          <div class="result-title">{{ r.ok ? '✔ Test passed' : '✖ Test failed' }}</div>
+          <div class="result-text">{{ r.text }}</div>
+          <div class="result-time">{{ r.at | date: 'mediumTime' }}</div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn small primary" *ngIf="!t.connected"
+                  [disabled]="t.busy" (click)="connect(t)">
+            {{ t.busy ? 'Connecting...' : 'Connect' }}
+          </button>
+          <button type="button" class="btn small danger-outline" *ngIf="t.connected"
+                  [disabled]="t.busy || t.testing" (click)="askDisconnect(t)">
+            Disconnect
+          </button>
+          <button type="button" class="btn small outline"
+                  [disabled]="!t.connected || t.testing || t.busy" (click)="test(t)">
+            {{ t.testing ? 'Testing...' : 'Test' }}
+          </button>
+        </div>
+      </article>
+    </div>
+  </ng-container>
+
+  <!-- Disconnect dialog -->
+  <div class="overlay" *ngIf="disconnectTarget">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="tDisTitle">
+      <h3 id="tDisTitle">Disconnect this tool?</h3>
+      <p>
+        <strong>{{ disconnectTarget.name }}</strong> will be disconnected.
+        <span *ngIf="disconnectTarget.usedBy > 0">
+          {{ plural(disconnectTarget.usedBy, 'agent') }} currently use it and will stop being able to.
+        </span>
+        You can connect it again later.
+      </p>
+      <div class="dialog-actions">
+        <button class="btn outline" (click)="cancelDisconnect()">Cancel</button>
+        <button class="btn danger" (click)="confirmDisconnect()">Disconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" *ngIf="toast" [ngClass]="toast.kind" role="status">{{ toast.text }}</div>
+</section>

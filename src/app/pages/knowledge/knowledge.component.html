@@ -1,0 +1,184 @@
+<section class="knowledge">
+  <!-- Header -->
+  <header class="page-head">
+    <div>
+      <h1>Knowledge</h1>
+      <p class="sub">Documents and web pages your agents are allowed to read.</p>
+    </div>
+  </header>
+
+  <!-- Not allowed -->
+  <div class="card gate" *ngIf="!canBuild">
+    <h2>Builders only</h2>
+    <p>Only builders and admins can manage knowledge. Ask an admin to change your role.</p>
+  </div>
+
+  <ng-container *ngIf="canBuild">
+    <!-- Hidden file input lives OUTSIDE the drop zone so its click does not bubble into it -->
+    <input #fileInput type="file" hidden multiple
+           accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+           (change)="onFiles(fileInput)">
+
+    <!-- Upload + link -->
+    <div class="upload-grid">
+      <div class="card">
+        <div class="dropzone" [class.drag]="dragging"
+             role="button" tabindex="0" aria-label="Upload files"
+             (click)="fileInput.click()"
+             (keydown.enter)="$event.preventDefault(); fileInput.click()"
+             (keydown.space)="$event.preventDefault(); fileInput.click()"
+             (dragover)="onDragOver($event)"
+             (dragleave)="onDragLeave($event)"
+             (drop)="onDrop($event)">
+          <span class="dz-ico">⬆️</span>
+          <span class="dz-title">Drop files here or click to choose</span>
+          <span class="dz-sub">PDF, Word, text and image files &middot; up to 10 MB each &middot; 5 files at a time</span>
+        </div>
+        <div class="error" *ngIf="fileError">{{ fileError }}</div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Add a web page link</h3>
+        <p class="hint">The page is read and indexed. Only http and https links are accepted.</p>
+        <div class="link-row">
+          <label class="sr" for="linkIn">Web page address</label>
+          <input id="linkIn" #linkIn class="text-in" type="text" inputmode="url"
+                 [class.invalid]="!!linkError"
+                 placeholder="https://example.com/page"
+                 (keydown.enter)="addLink(linkIn)">
+          <button type="button" class="btn primary" (click)="addLink(linkIn)">Add link</button>
+        </div>
+        <div class="error" *ngIf="linkError">{{ linkError }}</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search">
+        <label class="sr" for="kSearch">Search sources</label>
+        <input id="kSearch" #q type="search" placeholder="Search sources or agents..." (input)="onSearch(q.value)">
+      </div>
+
+      <div class="field-inline">
+        <label for="typeSel">Type</label>
+        <select id="typeSel" #ty (change)="onType(ty.value)">
+          <option value="all">All types</option>
+          <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+
+      <div class="field-inline">
+        <label for="statusSel">Status</label>
+        <select id="statusSel" #st (change)="onStatus(st.value)">
+          <option value="all">All</option>
+          <option value="ready">Ready</option>
+          <option value="indexing">Indexing</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+
+      <button type="button" class="link-btn" *ngIf="hasFilters" (click)="clearFilters(q, ty, st)">Clear</button>
+    </div>
+
+    <p class="summary" *ngIf="!loading && sources.length > 0">
+      {{ plural(sources.length, 'source') }} &middot; {{ readyCount }} ready &middot;
+      {{ indexingCount }} indexing &middot; {{ failedCount }} failed
+    </p>
+
+    <!-- Loading -->
+    <div class="card" *ngIf="loading">
+      <div class="skeleton" *ngFor="let n of [1, 2, 3, 4]"></div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap" *ngIf="!loading && paged.length > 0">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Type</th>
+            <th scope="col">Size</th>
+            <th scope="col">Status</th>
+            <th scope="col">Used by</th>
+            <th scope="col">Added</th>
+            <th scope="col" class="right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let s of paged; trackBy: trackById">
+            <td>
+              <div class="name-cell">
+                <span class="type-ico">{{ icon(s.type) }}</span>
+                <span class="nm">
+                  <span class="nm-title">{{ s.name }}</span>
+                  <span class="nm-sub" *ngIf="s.url">{{ s.url }}</span>
+                </span>
+              </div>
+            </td>
+            <td>{{ s.type }}</td>
+            <td>{{ formatSize(s.sizeBytes) }}</td>
+            <td>
+              <span class="status" [ngClass]="s.status">
+                <i class="dot"></i>{{ statusLabel(s.status) }}
+              </span>
+            </td>
+            <td>
+              <ng-container *ngIf="s.agents.length > 0; else unused">
+                <span class="agent-chip" *ngFor="let n of s.agents">{{ n }}</span>
+              </ng-container>
+              <ng-template #unused><span class="muted">Not used yet</span></ng-template>
+            </td>
+            <td>{{ s.addedAt | date: 'mediumDate' }}</td>
+            <td class="right">
+              <div class="row-actions">
+                <button type="button" class="btn small outline" [disabled]="s.status === 'indexing'" (click)="reindex(s)">Re-index</button>
+                <button type="button" class="btn small danger-outline" (click)="askDelete(s)">Delete</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty -->
+    <div class="card empty" *ngIf="!loading && paged.length === 0">
+      <ng-container *ngIf="sources.length === 0; else noMatch">
+        <h2>No knowledge yet</h2>
+        <p>Upload a document or add a web page link above, and your agents can start using it.</p>
+      </ng-container>
+      <ng-template #noMatch>
+        <h2>No sources match</h2>
+        <p>Try a different search or clear the filters.</p>
+        <button class="btn outline" (click)="clearFilters(q, ty, st)">Clear filters</button>
+      </ng-template>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pager" *ngIf="!loading && filtered.length > pageSize">
+      <button class="btn small outline" [disabled]="pageNum <= 1" (click)="goPage(pageNum - 1)">Previous</button>
+      <span>Page {{ pageNum }} of {{ totalPages }}</span>
+      <button class="btn small outline" [disabled]="pageNum >= totalPages" (click)="goPage(pageNum + 1)">Next</button>
+    </div>
+  </ng-container>
+
+  <!-- Delete dialog -->
+  <div class="overlay" *ngIf="deleteTarget">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="kDelTitle">
+      <h3 id="kDelTitle">Delete this source?</h3>
+      <p>
+        <strong>{{ deleteTarget.name }}</strong> will be removed.
+        <span *ngIf="deleteTarget.agents.length > 0">
+          {{ plural(deleteTarget.agents.length, 'agent') }} currently use it and will lose access.
+        </span>
+        This cannot be undone.
+      </p>
+      <div class="dialog-actions">
+        <button class="btn outline" (click)="cancelDelete()">Cancel</button>
+        <button class="btn danger" (click)="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" *ngIf="toast" [ngClass]="toast.kind" role="status">{{ toast.text }}</div>
+</section>

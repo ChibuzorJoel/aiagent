@@ -1,0 +1,128 @@
+<section class="account">
+
+  <!-- ================= SIGNED OUT: sign-in steps ================= -->
+  <div class="card auth" *ngIf="!signedIn">
+    <div class="auth-head">
+      <div class="logo">AI</div>
+      <h1>Sign in</h1>
+      <p *ngIf="step === 'email'">Enter your e-mail and we will send you a one-time code.</p>
+      <p *ngIf="step === 'code'">We sent a 6-digit code to <strong>{{ email }}</strong>.</p>
+      <p *ngIf="step === 'time'">One last check. Confirm the current date and time.</p>
+    </div>
+
+    <!-- Step dots -->
+    <ol class="steps" aria-label="Sign-in progress">
+      <li [class.on]="step === 'email'" [class.done]="step !== 'email'">1 E-mail</li>
+      <li [class.on]="step === 'code'" [class.done]="step === 'time'">2 Code</li>
+      <li *ngIf="requireDateTime" [class.on]="step === 'time'">3 Date and time</li>
+    </ol>
+
+    <div class="error" role="alert" *ngIf="error">{{ error }}</div>
+    <div class="info" aria-live="polite" *ngIf="info">{{ info }}</div>
+
+    <!-- Step 1: e-mail -->
+    <form *ngIf="step === 'email'" (submit)="onEmail($event, emailInput.value)" novalidate>
+      <label class="field" for="acEmail">E-mail address</label>
+      <input #emailInput id="acEmail" class="input" type="email"
+             autocomplete="email" inputmode="email"
+             placeholder="you@example.com" [value]="email" [disabled]="busy">
+      <button type="submit" class="btn primary block" [disabled]="busy">
+        {{ busy ? 'Sending...' : 'Send code' }}
+      </button>
+    </form>
+
+    <!-- Step 2: one-time code -->
+    <form *ngIf="step === 'code'" (submit)="onCode($event, codeInput.value)" novalidate>
+      <label class="field" for="acCode">One-time code</label>
+      <input #codeInput id="acCode" class="input code" type="text"
+             inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+             placeholder="000000" [disabled]="busy">
+      <button type="submit" class="btn primary block" [disabled]="busy">
+        {{ busy ? 'Checking...' : 'Verify code' }}
+      </button>
+
+      <div class="links">
+        <button type="button" class="link" (click)="backToEmail()" [disabled]="busy">Change e-mail</button>
+        <button type="button" class="link" (click)="resend()" [disabled]="busy || resendIn > 0">
+          {{ resendIn > 0 ? 'Resend in ' + resendIn + ' s' : 'Resend code' }}
+        </button>
+      </div>
+    </form>
+
+    <!-- Step 3: date and time verification -->
+    <form *ngIf="step === 'time'" (submit)="onTime($event, timeInput.value)" novalidate>
+      <label class="field" for="acTime">Today's date and time</label>
+      <input #timeInput id="acTime" class="input" type="datetime-local" [disabled]="busy">
+      <div class="hint">Use your current local date and time (a few minutes either way is fine).</div>
+      <button type="submit" class="btn primary block" [disabled]="busy">
+        {{ busy ? 'Verifying...' : 'Confirm and sign in' }}
+      </button>
+      <div class="links">
+        <button type="button" class="link" (click)="backToEmail()" [disabled]="busy">Start again</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ================= SIGNED IN: profile ================= -->
+  <ng-container *ngIf="signedIn">
+    <header class="page-head">
+      <div>
+        <h1>Account</h1>
+        <p>Your profile and quick links.</p>
+      </div>
+      <button type="button" class="btn danger" (click)="logout()">Logout</button>
+    </header>
+
+    <div class="grid">
+      <!-- Profile card -->
+      <div class="card">
+        <div class="who">
+          <span class="avatar">{{ initials }}</span>
+          <div>
+            <div class="name">{{ profile.name || 'Your name' }}</div>
+            <div class="mail">{{ profile.email }}</div>
+          </div>
+          <span class="chip" [ngClass]="role">{{ role | titlecase }}</span>
+        </div>
+
+        <div class="loading" aria-live="polite" *ngIf="loadingProfile">Loading your profile...</div>
+        <div class="success" role="status" *ngIf="saved">Profile saved.</div>
+        <div class="error" role="alert" *ngIf="error">{{ error }}</div>
+
+        <form (submit)="saveProfile($event, nameInput.value, phoneInput.value)" novalidate>
+          <label class="field" for="acName">Name</label>
+          <input #nameInput id="acName" class="input" type="text"
+                 autocomplete="name" maxlength="80"
+                 [value]="profile.name" placeholder="Your full name"
+                 [disabled]="busy || loadingProfile">
+
+          <label class="field" for="acPhone">Phone</label>
+          <input #phoneInput id="acPhone" class="input" type="tel"
+                 autocomplete="tel" inputmode="tel" maxlength="20"
+                 [value]="profile.phone" placeholder="+234 800 000 0000"
+                 [disabled]="busy || loadingProfile">
+
+          <label class="field" for="acEmailRo">E-mail</label>
+          <input id="acEmailRo" class="input" type="email" [value]="profile.email" disabled>
+
+          <button type="submit" class="btn primary" [disabled]="busy || loadingProfile">
+            {{ busy ? 'Saving...' : 'Save changes' }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Quick links -->
+      <div class="card">
+        <h2>Quick links</h2>
+        <nav class="quick" aria-label="Quick links">
+          <a class="q" *ngFor="let q of quickLinks" [routerLink]="q.route">
+            <span class="ico">{{ q.icon }}</span>
+            <span class="lbl">{{ q.label }}</span>
+            <span class="go">&rsaquo;</span>
+          </a>
+        </nav>
+      </div>
+    </div>
+  </ng-container>
+
+</section>

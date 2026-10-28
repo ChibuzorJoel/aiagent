@@ -1,0 +1,143 @@
+<section class="usage">
+
+  <header class="page-head">
+    <div>
+      <h1>Usage</h1>
+      <p>Messages, cost and limits for the agents.</p>
+    </div>
+    <div class="range">
+      <label class="tiny" for="usRange">Period</label>
+      <select id="usRange" #rangeSel class="select" (change)="onRange(rangeSel.value)" [disabled]="loading">
+        <option value="7" [selected]="rangeDays === 7">Last 7 days</option>
+        <option value="14" [selected]="rangeDays === 14">Last 14 days</option>
+        <option value="30" [selected]="rangeDays === 30">Last 30 days</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="error" role="alert" *ngIf="error">
+    <span>{{ error }}</span>
+    <button type="button" class="btn small outline" (click)="load()" [disabled]="loading">Retry</button>
+  </div>
+
+  <!-- Skeleton -->
+  <div *ngIf="loading" aria-busy="true">
+    <div class="stats">
+      <div class="skel short" *ngFor="let s of skeletons"></div>
+    </div>
+    <div class="skel tall"></div>
+  </div>
+
+  <ng-container *ngIf="!loading && !error">
+
+    <!-- Monthly limit -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Monthly limit</h2>
+        <span class="state" [ngClass]="limitState">
+          {{ limitState === 'danger' ? '✖ Limit reached' : (limitState === 'warn' ? '⚠ Close to the limit' : '✔ Within the limit') }}
+        </span>
+      </div>
+      <div class="progress" role="progressbar" aria-label="Monthly cost limit"
+           aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="limitPct">
+        <div class="fill" [ngClass]="limitState" [style.width.%]="limitPct"></div>
+      </div>
+      <div class="p-text">
+        {{ limitPct }}% used &middot; ${{ monthCost | number: '1.2-2' }} of ${{ monthLimit | number: '1.2-2' }} this month
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num">{{ totalMessages | number }}</div>
+        <div class="stat-lbl">Messages</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">${{ totalCost | number: '1.2-2' }}</div>
+        <div class="stat-lbl">Cost</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">${{ avgCost | number: '1.3-3' }}</div>
+        <div class="stat-lbl">Average cost per message</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts">
+      <div class="card">
+        <h2>Messages per day</h2>
+        <div class="chart" role="img"
+             [attr.aria-label]="'Bar chart of messages per day for the last ' + days.length + ' days. Total ' + totalMessages + ' messages.'">
+          <div class="plot">
+            <div class="col" *ngFor="let d of days"
+                 [title]="(d.date | date: 'd MMM') + ': ' + d.messages + ' messages'">
+              <div class="bar teal" [style.height.%]="pct(d.messages, maxMessages)"></div>
+            </div>
+          </div>
+          <div class="axis">
+            <span *ngFor="let d of days; let i = index">{{ showLabel(i) ? (d.date | date: 'd/M') : '' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cost per day</h2>
+        <div class="chart" role="img"
+             [attr.aria-label]="'Bar chart of cost per day for the last ' + days.length + ' days. Total $' + (totalCost | number: '1.2-2') + '.'">
+          <div class="plot">
+            <div class="col" *ngFor="let d of days"
+                 [title]="(d.date | date: 'd MMM') + ': $' + (d.cost | number: '1.2-2')">
+              <div class="bar indigo" [style.height.%]="pct(d.cost, maxCost)"></div>
+            </div>
+          </div>
+          <div class="axis">
+            <span *ngFor="let d of days; let i = index">{{ showLabel(i) ? (d.date | date: 'd/M') : '' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables -->
+    <div class="tables">
+      <div class="card">
+        <h2>By agent</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Agent</th><th class="num">Messages</th><th class="num">Cost</th><th class="num">Share</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of byAgent">
+                <td>{{ r.name }}</td>
+                <td class="num">{{ r.messages | number }}</td>
+                <td class="num">${{ r.cost | number: '1.2-2' }}</td>
+                <td class="num">{{ r.share }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>By person</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Person</th><th class="num">Messages</th><th class="num">Cost</th><th class="num">Share</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of byPerson">
+                <td>{{ r.name }}</td>
+                <td class="num">{{ r.messages | number }}</td>
+                <td class="num">${{ r.cost | number: '1.2-2' }}</td>
+                <td class="num">{{ r.share }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </ng-container>
+</section>

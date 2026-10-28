@@ -1,0 +1,121 @@
+:host {
+  --navy: #0b1220;
+  --teal: #14b8a6;
+  --teal-dark: #0f766e;
+  --indigo: #4338ca;
+  --border: #e2e8f0;
+  --danger: #dc2626;
+  display: block;
+  color: var(--navy);
+}
+
+.limits { max-width: 760px; margin: 0 auto; }
+
+h1 { margin: 0; font-size: 1.9rem; font-weight: 700; }
+h2 { margin: 0 0 0.3rem; font-size: 1.05rem; font-weight: 700; }
+
+/* ---------- Header ---------- */
+.page-head {
+  margin-bottom: 1.2rem;
+  p { margin: 0.3rem 0 0; color: #64748b; font-size: 0.92rem; }
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  border: 1px solid transparent; cursor: pointer;
+  padding: 0.6rem 1.1rem; border-radius: 10px;
+  font-size: 0.9rem; font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+
+  &:hover:not(:disabled) { transform: translateY(-2px); }
+  &:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  &.primary { color: #fff; background: linear-gradient(135deg, var(--teal), var(--indigo)); }
+  &.outline { background: #fff; color: var(--teal-dark); border-color: var(--teal); }
+  &.small   { padding: 0.35rem 0.85rem; font-size: 0.82rem; }
+}
+
+/* ---------- Messages ---------- */
+.error, .success {
+  margin: 0 0 1rem; padding: 0.6rem 0.8rem;
+  border-radius: 10px; font-size: 0.86rem;
+}
+.error {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;
+  background: #fef2f2; color: var(--danger); border: 1px solid #fca5a5;
+}
+.success { background: #ecfdf5; color: #059669; border: 1px solid #6ee7b7; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1.1rem;
+  animation: fade 0.2s ease;
+
+  .desc { margin: 0 0 0.6rem; color: #64748b; font-size: 0.88rem; }
+}
+
+.field {
+  display: block; margin: 0.6rem 0 0.3rem;
+  font-size: 0.78rem; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.input {
+  width: 100%; max-width: 320px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  font: inherit; font-size: 0.95rem; color: var(--navy); background: #fff;
+
+  &:focus { outline: 2px solid var(--teal); outline-offset: 0; border-color: transparent; }
+  &:disabled { background: #f1f5f9; cursor: not-allowed; }
+}
+.hint { margin-top: 0.35rem; font-size: 0.78rem; color: #64748b; }
+
+/* ---------- Tool checklist ---------- */
+.checks { display: grid; gap: 0.5rem; }
+.check {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: var(--teal); }
+  input { width: 18px; height: 18px; accent-color: var(--danger); flex: none; }
+  &:focus-within { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .check-text { flex: 1; display: grid; gap: 0.1rem; font-size: 0.92rem; }
+  .check-desc { font-size: 0.8rem; color: #64748b; }
+}
+.tag {
+  font-size: 0.74rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px;
+  background: #fef2f2; color: var(--danger); white-space: nowrap;
+}
+
+/* ---------- Actions ---------- */
+.actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-bottom: 1rem; }
+
+/* ---------- Skeleton ---------- */
+.skel {
+  height: 120px; margin-bottom: 1.1rem; border-radius: 14px;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 991px) {
+  h1 { font-size: 1.6rem; }
+  .input { max-width: 100%; }
+  .actions { flex-direction: column-reverse; .btn { width: 100%; } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

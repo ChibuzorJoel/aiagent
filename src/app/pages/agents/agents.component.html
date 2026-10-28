@@ -1,0 +1,244 @@
+<section class="agents">
+  <!-- Header -->
+  <header class="page-head">
+    <div>
+      <h1>My Agents</h1>
+      <p class="sub">Create agents, give them documents and tools, then publish them for your team.</p>
+    </div>
+    <button class="btn primary" *ngIf="canBuild" (click)="openNew()">+ New agent</button>
+  </header>
+
+  <!-- Not allowed -->
+  <div class="card gate" *ngIf="!canBuild">
+    <h2>Builders only</h2>
+    <p>Only builders and admins can create and edit agents. Ask an admin to change your role.</p>
+  </div>
+
+  <ng-container *ngIf="canBuild">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search">
+        <label class="sr" for="agentSearch">Search agents</label>
+        <input id="agentSearch" #q type="search" placeholder="Search agents..." (input)="onSearch(q.value)">
+      </div>
+
+      <div class="field-inline">
+        <label for="statusSel">Status</label>
+        <select id="statusSel" #st (change)="onStatus(st.value)">
+          <option value="all">All</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+        </select>
+      </div>
+
+      <div class="field-inline">
+        <label for="sortSel">Sort</label>
+        <select id="sortSel" #so (change)="onSort(so.value)">
+          <option value="new">Newest first</option>
+          <option value="name">Name A to Z</option>
+        </select>
+      </div>
+
+      <button type="button" class="link-btn" *ngIf="hasFilters" (click)="clearFilters(q, st, so)">Clear</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="grid" *ngIf="loading">
+      <div class="skeleton" *ngFor="let n of [1, 2, 3]"></div>
+    </div>
+
+    <!-- Cards -->
+    <div class="grid" *ngIf="!loading && paged.length > 0">
+      <article class="agent-card" *ngFor="let a of paged; trackBy: trackById">
+        <div class="top">
+          <span class="avatar" [style.background]="a.color">{{ initial(a.name) }}</span>
+          <span class="status" [ngClass]="a.status">
+            <i class="dot"></i>{{ a.status === 'published' ? 'Published' : 'Draft' }}
+          </span>
+        </div>
+
+        <h3>{{ a.name }}</h3>
+        <p class="purpose">{{ a.purpose || 'No description yet.' }}</p>
+
+        <div class="counts">
+          <span>🧰 {{ plural(a.tools.length, 'tool') }}</span>
+          <span>📚 {{ plural(a.knowledgeIds.length, 'document') }}</span>
+        </div>
+
+        <div class="actions">
+          <button class="btn small outline" (click)="openEdit(a)">Edit</button>
+          <button class="btn small outline" (click)="togglePublish(a)">
+            {{ a.status === 'published' ? 'Unpublish' : 'Publish' }}
+          </button>
+          <button class="btn small danger-outline" (click)="askDelete(a)">Delete</button>
+        </div>
+      </article>
+    </div>
+
+    <!-- Empty -->
+    <div class="card empty" *ngIf="!loading && paged.length === 0">
+      <ng-container *ngIf="agents.length === 0; else noMatch">
+        <h2>No agents yet</h2>
+        <p>Create your first agent to get started.</p>
+        <button class="btn primary" (click)="openNew()">+ New agent</button>
+      </ng-container>
+      <ng-template #noMatch>
+        <h2>No agents match</h2>
+        <p>Try a different search or clear the filters.</p>
+        <button class="btn outline" (click)="clearFilters(q, st, so)">Clear filters</button>
+      </ng-template>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pager" *ngIf="!loading && filtered.length > pageSize">
+      <button class="btn small outline" [disabled]="pageNum <= 1" (click)="goPage(pageNum - 1)">Previous</button>
+      <span>Page {{ pageNum }} of {{ totalPages }}</span>
+      <button class="btn small outline" [disabled]="pageNum >= totalPages" (click)="goPage(pageNum + 1)">Next</button>
+    </div>
+  </ng-container>
+
+  <!-- ============ Create / edit panel ============ -->
+  <div class="overlay" *ngIf="panelOpen"></div>
+
+  <aside class="panel" *ngIf="panelOpen" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <header class="panel-head">
+      <h2 id="panelTitle">{{ draft.id ? 'Edit agent' : 'New agent' }}</h2>
+      <button type="button" class="x-btn" (click)="closePanel()" aria-label="Close panel">&times;</button>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" class="tab" *ngFor="let t of tabs"
+              [class.active]="panelTab === t.key"
+              [attr.aria-selected]="panelTab === t.key"
+              (click)="setTab(t.key)">{{ t.label }}</button>
+    </div>
+
+    <div class="panel-body">
+      <!-- Basics -->
+      <div *ngIf="panelTab === 'basics'">
+        <div class="field">
+          <label for="agName">Name</label>
+          <input id="agName" #nameIn type="text" maxlength="60" [value]="draft.name"
+                 [class.invalid]="submitted && !draft.name.trim()"
+                 (input)="draft.name = nameIn.value" placeholder="For example: Sales Assistant">
+          <div class="field-foot">
+            <span class="error" *ngIf="submitted && !draft.name.trim()">Please give the agent a name.</span>
+            <span class="count">{{ draft.name.length }}/60</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="agPurpose">Purpose</label>
+          <input id="agPurpose" #purposeIn type="text" maxlength="140" [value]="draft.purpose"
+                 (input)="draft.purpose = purposeIn.value" placeholder="One line about what this agent is for">
+        </div>
+
+        <div class="field">
+          <span class="label">Avatar colour</span>
+          <div class="swatches">
+            <button type="button" class="swatch" *ngFor="let c of colors"
+                    [style.background]="c"
+                    [class.selected]="draft.color === c"
+                    [attr.aria-label]="'Colour ' + c"
+                    [attr.aria-pressed]="draft.color === c"
+                    (click)="draft.color = c"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instructions -->
+      <div *ngIf="panelTab === 'instructions'">
+        <div class="field">
+          <label for="agInstr">Instructions</label>
+          <textarea id="agInstr" #instrIn rows="12" [value]="draft.instructions"
+                    [class.invalid]="submitted && draft.status === 'published' && !draft.instructions.trim()"
+                    (input)="draft.instructions = instrIn.value"
+                    placeholder="What should this agent do? What must it never do?"></textarea>
+          <p class="hint">Tell the agent to say when it does not know, and to name the document it used.</p>
+        </div>
+      </div>
+
+      <!-- Knowledge -->
+      <div *ngIf="panelTab === 'knowledge'">
+        <p class="hint top-hint">Tick the documents this agent may read.</p>
+        <label class="row-check" *ngFor="let d of knowledgeDocs">
+          <input type="checkbox" [checked]="hasDoc(d.id)" (change)="toggleDoc(d.id)">
+          <span class="row-main">
+            <span class="row-title">{{ d.name }}</span>
+            <span class="row-sub">{{ d.type }}</span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Tools -->
+      <div *ngIf="panelTab === 'tools'">
+        <p class="hint top-hint">Tick the tools this agent may use. Choose whether it must ask first.</p>
+        <div class="row-check tool-row" *ngFor="let t of toolsCatalog">
+          <label class="tool-left">
+            <input type="checkbox" [checked]="!!toolSetting(t.id)" (change)="toggleTool(t.id)">
+            <span class="row-main">
+              <span class="row-title">{{ t.name }}</span>
+              <span class="row-sub">{{ t.description }}</span>
+            </span>
+          </label>
+
+          <div class="tool-mode">
+            <label class="sr" [attr.for]="'mode-' + t.id">Permission for {{ t.name }}</label>
+            <select [id]="'mode-' + t.id" #modeSel [disabled]="!toolSetting(t.id)"
+                    (change)="setToolMode(t.id, modeSel.value)">
+              <option value="ask" [selected]="toolMode(t.id) === 'ask'">Ask me first</option>
+              <option value="allowed" [selected]="toolMode(t.id) === 'allowed'">Allowed</option>
+            </select>
+            <span class="warn" *ngIf="t.sideEffects && toolSetting(t.id) && toolMode(t.id) === 'allowed'">
+              This tool changes or sends data.
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test -->
+      <div *ngIf="panelTab === 'test'">
+        <p class="hint top-hint">Try your changes here before you publish. Nothing is saved from this chat.</p>
+
+        <div class="test-box" #testScroll>
+          <div class="test-empty" *ngIf="testMessages.length === 0">Say hello to {{ draft.name || 'your agent' }}.</div>
+          <div class="t-msg" *ngFor="let m of testMessages" [ngClass]="m.role">
+            <span class="t-bubble">{{ m.text }}</span>
+          </div>
+          <div class="t-msg agent" *ngIf="testThinking"><span class="t-bubble">...</span></div>
+        </div>
+
+        <div class="test-row">
+          <label class="sr" for="testInput">Test message</label>
+          <input id="testInput" #ti type="text" placeholder="Type a test message..."
+                 (keydown.enter)="sendTest(ti)">
+          <button type="button" class="btn small primary" [disabled]="testThinking" (click)="sendTest(ti)">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="panel-foot">
+      <button type="button" class="btn outline" (click)="closePanel()">Cancel</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn outline" (click)="save()">Save</button>
+      <button type="button" class="btn primary" (click)="save(draft.status === 'published' ? 'draft' : 'published')">
+        {{ draft.status === 'published' ? 'Save and unpublish' : 'Save and publish' }}
+      </button>
+    </footer>
+  </aside>
+
+  <!-- ============ Delete dialog ============ -->
+  <div class="overlay dialog-overlay" *ngIf="deleteTarget">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="delTitle">
+      <h3 id="delTitle">Delete this agent?</h3>
+      <p><strong>{{ deleteTarget.name }}</strong> will be removed for everyone who uses it. This cannot be undone.</p>
+      <div class="dialog-actions">
+        <button class="btn outline" (click)="cancelDelete()">Cancel</button>
+        <button class="btn danger" (click)="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" *ngIf="toast" [ngClass]="toast.kind" role="status">{{ toast.text }}</div>
+</section>

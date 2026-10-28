@@ -1,0 +1,176 @@
+:host {
+  --navy: #0b1220;
+  --teal: #14b8a6;
+  --teal-dark: #0f766e;
+  --indigo: #4338ca;
+  --border: #e2e8f0;
+  --danger: #dc2626;
+  display: block;
+  color: var(--navy);
+}
+
+.approvals { max-width: 960px; margin: 0 auto; }
+
+h1 { margin: 0; font-size: 1.9rem; font-weight: 700; }
+h2 { margin: 0 0 0.5rem; font-size: 1.05rem; font-weight: 700; }
+
+/* ---------- Header ---------- */
+.page-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem;
+  p { margin: 0.3rem 0 0; color: #64748b; font-size: 0.92rem; }
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  border: 1px solid transparent; cursor: pointer;
+  padding: 0.6rem 1.1rem; border-radius: 10px;
+  font-size: 0.9rem; font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+
+  &:hover:not(:disabled) { transform: translateY(-2px); }
+  &:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  &.primary { color: #fff; background: linear-gradient(135deg, var(--teal), var(--indigo)); }
+  &.outline { background: #fff; color: var(--teal-dark); border-color: var(--teal); }
+  &.danger  { background: var(--danger); color: #fff; }
+  &.small   { padding: 0.35rem 0.85rem; font-size: 0.82rem; }
+}
+
+/* ---------- Messages ---------- */
+.error, .success {
+  margin: 0 0 1rem; padding: 0.6rem 0.8rem;
+  border-radius: 10px; font-size: 0.86rem;
+}
+.error {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;
+  background: #fef2f2; color: var(--danger); border: 1px solid #fca5a5;
+}
+.success { background: #ecfdf5; color: #059669; border: 1px solid #6ee7b7; }
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex; gap: 0.4rem; margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  background: none; border: 0; cursor: pointer;
+  padding: 0.6rem 1rem; margin-bottom: -1px;
+  font-size: 0.92rem; font-weight: 600; color: #64748b;
+  border-bottom: 2px solid transparent;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+
+  &:hover { color: var(--navy); }
+  &:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 6px; }
+  &.on { color: var(--teal-dark); border-bottom-color: var(--teal); }
+}
+.count {
+  min-width: 1.3rem; padding: 0 0.4rem;
+  background: #dc2626; color: #fff;
+  font-size: 0.72rem; font-weight: 700; line-height: 1.3rem;
+  text-align: center; border-radius: 999px;
+}
+
+/* ---------- List ---------- */
+.list { display: grid; gap: 0.8rem; }
+
+.item {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid #fcd34d;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 1.1rem 1.3rem;
+  animation: fade 0.2s ease;
+
+  &.approved { border-left-color: #059669; }
+  &.rejected { border-left-color: var(--danger); }
+
+  .item-top { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
+  .agent { font-weight: 700; font-size: 0.95rem; }
+  .text { margin: 0.5rem 0; font-size: 0.93rem; line-height: 1.5; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.3rem 1rem;
+    font-size: 0.8rem; color: #64748b;
+  }
+  .reason {
+    margin-top: 0.6rem; padding: 0.5rem 0.7rem;
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 0.85rem; overflow-wrap: anywhere;
+  }
+  .actions { display: flex; gap: 0.5rem; margin-top: 0.9rem; }
+}
+
+.status {
+  font-size: 0.76rem; font-weight: 700;
+  padding: 0.22rem 0.65rem; border-radius: 999px;
+  &.pending  { background: #fef3c7; color: #b45309; }
+  &.approved { background: #ecfdf5; color: #059669; }
+  &.rejected { background: #fef2f2; color: var(--danger); }
+}
+
+/* ---------- Skeleton ---------- */
+.skel {
+  height: 112px; border-radius: 14px;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+/* ---------- Empty ---------- */
+.empty {
+  text-align: center; padding: 2.5rem 1rem;
+  background: #fff; border: 1px dashed var(--border); border-radius: 14px;
+  .empty-ico { font-size: 2rem; }
+  p { margin: 0 0 1rem; color: #64748b; font-size: 0.9rem; }
+}
+
+/* ---------- Pagination ---------- */
+.pager {
+  display: flex; align-items: center; justify-content: center; gap: 1rem;
+  margin-top: 1.2rem; font-size: 0.85rem; color: #475569;
+}
+
+/* ---------- Dialog ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(11, 18, 32, 0.55);
+  display: grid; place-items: center; padding: 1rem;
+}
+.dialog {
+  width: 100%; max-width: 460px;
+  background: #fff; border-radius: 14px; padding: 1.4rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  animation: fade 0.18s ease;
+
+  .dlg-agent { margin: 0; font-size: 0.78rem; font-weight: 700; color: var(--indigo); text-transform: uppercase; letter-spacing: 0.05em; }
+  .dlg-text { margin: 0.3rem 0 0.5rem; font-size: 0.93rem; line-height: 1.5; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.1rem; }
+}
+.field {
+  display: block; margin: 0.9rem 0 0.3rem;
+  font-size: 0.78rem; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.input {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  font: inherit; font-size: 0.93rem; color: var(--navy); background: #fff;
+
+  &:focus { outline: 2px solid var(--teal); outline-offset: 0; border-color: transparent; }
+  &:disabled { background: #f1f5f9; cursor: not-allowed; }
+}
+
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 991px) {
+  h1 { font-size: 1.6rem; }
+  .item { padding: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

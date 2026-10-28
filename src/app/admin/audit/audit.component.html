@@ -1,0 +1,99 @@
+<section class="audit">
+
+  <header class="page-head">
+    <div>
+      <h1>Audit Log</h1>
+      <p>Who changed what, and when. This list is read-only.</p>
+    </div>
+    <button type="button" class="btn outline" (click)="load()" [disabled]="loading">Refresh</button>
+  </header>
+
+  <div class="error" role="alert" *ngIf="error">
+    <span>{{ error }}</span>
+    <button type="button" class="btn small outline" (click)="load()" [disabled]="loading">Retry</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="toolbar">
+    <div class="f">
+      <label class="tiny" for="auPerson">Person</label>
+      <select #ps id="auPerson" class="select" (change)="onPerson(ps.value)">
+        <option value="">Everyone</option>
+        <option *ngFor="let p of persons" [value]="p">{{ p }}</option>
+      </select>
+    </div>
+
+    <div class="f">
+      <label class="tiny" for="auAction">Action</label>
+      <select #ac id="auAction" class="select" (change)="onAction(ac.value)">
+        <option value="">All actions</option>
+        <option *ngFor="let a of actionKeys" [value]="a">{{ actionLabel(a) }}</option>
+      </select>
+    </div>
+
+    <div class="f">
+      <label class="tiny" for="auFrom">From</label>
+      <input #fi id="auFrom" class="select" type="date" (change)="onFrom(fi.value)">
+    </div>
+
+    <div class="f">
+      <label class="tiny" for="auTo">To</label>
+      <input #ti id="auTo" class="select" type="date" (change)="onTo(ti.value)">
+    </div>
+
+    <button type="button" class="link" (click)="clearFilters(ps, ac, fi, ti)" *ngIf="hasFilters">Clear</button>
+  </div>
+
+  <div class="error" role="alert" *ngIf="dateError">The start date is after the end date.</div>
+
+  <!-- Skeleton -->
+  <div class="card" *ngIf="loading" aria-busy="true">
+    <div class="skel" *ngFor="let s of skeletons"></div>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty" *ngIf="!loading && !error && filtered.length === 0">
+    <div class="empty-ico">🧾</div>
+    <h2>{{ entries.length === 0 ? 'Nothing has been recorded yet' : 'No entries match your filters' }}</h2>
+    <p *ngIf="entries.length === 0">Changes made in the application will be listed here.</p>
+    <button type="button" class="btn outline" *ngIf="entries.length > 0" (click)="clearFilters(ps, ac, fi, ti)">Clear filters</button>
+  </div>
+
+  <!-- Table -->
+  <div class="card" *ngIf="!loading && filtered.length > 0">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Person</th>
+            <th>Action</th>
+            <th>Item</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let e of pageItems; trackBy: trackById">
+            <td class="nowrap">{{ e.time | date: 'd MMM y, HH:mm' }}</td>
+            <td>{{ e.person }}</td>
+            <td><span class="chip" [ngClass]="actionGroup(e.action)">{{ actionLabel(e.action) }}</span></td>
+            <td class="item">{{ e.target }}</td>
+            <td class="details">{{ e.details }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="count" *ngIf="!loading && filtered.length > 0">
+    Showing {{ pageStart }} to {{ pageEnd }} of {{ filtered.length }} entries
+  </div>
+
+  <!-- Pagination -->
+  <div class="pager" *ngIf="!loading && totalPages > 1">
+    <button type="button" class="btn small outline" (click)="prev()" [disabled]="page <= 1">Previous</button>
+    <span>Page {{ page }} of {{ totalPages }}</span>
+    <button type="button" class="btn small outline" (click)="next()" [disabled]="page >= totalPages">Next</button>
+  </div>
+
+</section>

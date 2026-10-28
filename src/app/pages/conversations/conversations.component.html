@@ -1,0 +1,116 @@
+<section class="convos">
+  <!-- Header -->
+  <header class="page-head">
+    <div>
+      <h1>History</h1>
+      <p class="sub">Search and reopen your past conversations.</p>
+    </div>
+    <button class="btn primary" (click)="newChat()">+ New chat</button>
+  </header>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search">
+      <label class="sr" for="convoSearch">Search conversations</label>
+      <input id="convoSearch" #q type="search" placeholder="Search conversations..." (input)="onSearch(q.value)">
+    </div>
+
+    <div class="field-inline">
+      <label for="agentSel">Agent</label>
+      <select id="agentSel" #ag (change)="onAgent(ag.value)">
+        <option value="all">All agents</option>
+        <option *ngFor="let a of agentOptions" [value]="a.id">{{ a.name }}</option>
+      </select>
+    </div>
+
+    <button type="button" class="link-btn" *ngIf="hasFilters" (click)="clearFilters(q, ag)">Clear</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="list" *ngIf="loading">
+    <div class="skeleton" *ngFor="let n of [1, 2, 3, 4, 5]"></div>
+  </div>
+
+  <!-- List -->
+  <div class="list" *ngIf="!loading && paged.length > 0">
+    <article class="row" *ngFor="let c of paged; trackBy: trackById">
+      <button type="button" class="row-main" (click)="open(c)" [attr.aria-label]="'Open ' + c.title">
+        <span class="avatar" [style.background]="c.color">{{ initial(c.agentName) }}</span>
+        <span class="info">
+          <span class="title">{{ c.title }}</span>
+          <span class="preview">{{ c.lastMessage }}</span>
+          <span class="meta">
+            <span class="agent-chip">{{ c.agentName }}</span>
+            <span>{{ plural(c.messageCount, 'message') }}</span>
+            <span>&middot;</span>
+            <span>{{ when(c.updatedAt) }}</span>
+          </span>
+        </span>
+      </button>
+
+      <div class="row-actions">
+        <button type="button" class="btn small outline" (click)="askRename(c)">Rename</button>
+        <button type="button" class="btn small danger-outline" (click)="askDelete(c)">Delete</button>
+      </div>
+    </article>
+  </div>
+
+  <!-- Empty -->
+  <div class="card empty" *ngIf="!loading && paged.length === 0">
+    <ng-container *ngIf="conversations.length === 0; else noMatch">
+      <h2>No conversations yet</h2>
+      <p>Start a chat with an agent and it will appear here.</p>
+      <button class="btn primary" (click)="newChat()">Start your first chat</button>
+    </ng-container>
+    <ng-template #noMatch>
+      <h2>No conversations match</h2>
+      <p>Try a different search or clear the filters.</p>
+      <button class="btn outline" (click)="clearFilters(q, ag)">Clear filters</button>
+    </ng-template>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pager" *ngIf="!loading && filtered.length > pageSize">
+    <button class="btn small outline" [disabled]="pageNum <= 1" (click)="goPage(pageNum - 1)">Previous</button>
+    <span>Page {{ pageNum }} of {{ totalPages }}</span>
+    <button class="btn small outline" [disabled]="pageNum >= totalPages" (click)="goPage(pageNum + 1)">Next</button>
+  </div>
+
+  <!-- Rename dialog -->
+  <div class="overlay" *ngIf="renameTarget">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="renTitle">
+      <h3 id="renTitle">Rename conversation</h3>
+      <label class="sr" for="renameInput">Conversation title</label>
+      <input id="renameInput" #renameIn type="text" maxlength="80"
+             [value]="renameText"
+             [class.invalid]="!!renameError"
+             (input)="renameText = renameIn.value"
+             (keydown.enter)="saveRename()">
+      <div class="field-foot">
+        <span class="error" *ngIf="renameError">{{ renameError }}</span>
+        <span class="count">{{ renameText.length }}/80</span>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn outline" (click)="cancelRename()">Cancel</button>
+        <button class="btn primary" (click)="saveRename()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete dialog -->
+  <div class="overlay" *ngIf="deleteTarget">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="delTitle">
+      <h3 id="delTitle">Delete this conversation?</h3>
+      <p><strong>{{ deleteTarget.title }}</strong> and all its messages will be removed. This cannot be undone.</p>
+      <div class="dialog-actions">
+        <button class="btn outline" (click)="cancelDelete()">Cancel</button>
+        <button class="btn danger" (click)="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" *ngIf="toast" [ngClass]="toast.kind" role="status">{{ toast.text }}</div>
+</section>
+
+

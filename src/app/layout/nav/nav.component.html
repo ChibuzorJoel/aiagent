@@ -1,0 +1,53 @@
+<!-- Mobile top bar -->
+<header class="topbar">
+  <button class="hamburger" type="button" (click)="toggleDrawer()" aria-label="Open menu" [attr.aria-expanded]="drawerOpen">
+    <span></span><span></span><span></span>
+  </button>
+  <span class="topbar-title">AI Agent Workspace</span>
+</header>
+
+<div class="backdrop" *ngIf="drawerOpen" (click)="closeDrawer()"></div>
+
+<aside class="sidebar" [class.open]="drawerOpen" aria-label="Main navigation">
+  <div class="brand">
+    <div class="logo">AI</div>
+    <div>
+      <div class="brand-name">Agent Workspace</div>
+      <div class="brand-sub" *ngIf="signedIn">{{ role | titlecase }}</div>
+    </div>
+  </div>
+
+  <nav class="menu">
+    <div class="group" *ngFor="let g of visibleGroups; trackBy: trackGroup" [class.open]="openGroup === g.key">
+      <button class="group-head" type="button"
+              (click)="toggleGroup(g.key, $event)"
+              [attr.aria-expanded]="openGroup === g.key">
+        <span>{{ g.label }}</span>
+        <span class="chev" aria-hidden="true">&#9662;</span>
+      </button>
+
+      <ul class="items" *ngIf="openGroup === g.key">
+        <li *ngFor="let i of g.items; trackBy: trackItem">
+          <a *ngIf="i.route && !i.action"
+             class="item"
+             [routerLink]="i.route"
+             routerLinkActive="active"
+             (click)="closeDrawer()">
+            <span class="ico">{{ i.icon }}</span>
+            <span class="lbl">{{ i.label }}</span>
+            <span class="badge" *ngIf="i.badge" [attr.aria-label]="i.badge + ' waiting'">{{ i.badge }}</span>
+          </a>
+
+          <button *ngIf="i.action === 'logout'" class="item" type="button" (click)="logout()">
+            <span class="ico">{{ i.icon }}</span>
+            <span class="lbl">{{ i.label }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+  </nav>
+</aside>
+
+<main class="content">
+  <router-outlet></router-outlet>
+</main>
