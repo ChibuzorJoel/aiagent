@@ -106,7 +106,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let s of paged; trackBy: trackById">
-            <td>
+            <td data-label="Name">
               <div class="name-cell">
                 <span class="type-ico">{{ icon(s.type) }}</span>
                 <span class="nm">
@@ -115,21 +115,21 @@
                 </span>
               </div>
             </td>
-            <td>{{ s.type }}</td>
-            <td>{{ formatSize(s.sizeBytes) }}</td>
-            <td>
+            <td data-label="Type">{{ s.type }}</td>
+            <td data-label="Size">{{ formatSize(s.sizeBytes) }}</td>
+            <td data-label="Status">
               <span class="status" [ngClass]="s.status">
                 <i class="dot"></i>{{ statusLabel(s.status) }}
               </span>
             </td>
-            <td>
+            <td data-label="Used by">
               <ng-container *ngIf="s.agents.length > 0; else unused">
                 <span class="agent-chip" *ngFor="let n of s.agents">{{ n }}</span>
               </ng-container>
               <ng-template #unused><span class="muted">Not used yet</span></ng-template>
             </td>
-            <td>{{ s.addedAt | date: 'mediumDate' }}</td>
-            <td class="right">
+            <td data-label="Added">{{ s.addedAt | date: 'mediumDate' }}</td>
+            <td class="right" data-label="Actions">
               <div class="row-actions">
                 <button type="button" class="btn small outline" [disabled]="s.status === 'indexing'" (click)="reindex(s)">Re-index</button>
                 <button type="button" class="btn small danger-outline" (click)="askDelete(s)">Delete</button>

@@ -131,8 +131,10 @@ export class UsageComponent implements OnInit, OnDestroy {
 
   /** Show every day for short ranges, every 5th day for longer ones. */
   showLabel(index: number): boolean {
-    if (this.days.length <= 14) { return true; }
-    return index % 5 === 0 || index === this.days.length - 1;
+    // Fewer labels on narrow screens so the dates do not run into each other
+    const step = window.innerWidth < 600 ? 4 : (this.days.length <= 14 ? 1 : 5);
+    if (step === 1) { return true; }
+    return index % step === 0 || index === this.days.length - 1;
   }
 
   private later(fn: () => void, ms: number): void {

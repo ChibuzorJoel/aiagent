@@ -74,11 +74,11 @@
         </thead>
         <tbody>
           <tr *ngFor="let e of pageItems; trackBy: trackById">
-            <td class="nowrap">{{ e.time | date: 'd MMM y, HH:mm' }}</td>
-            <td>{{ e.person }}</td>
-            <td><span class="chip" [ngClass]="actionGroup(e.action)">{{ actionLabel(e.action) }}</span></td>
-            <td class="item">{{ e.target }}</td>
-            <td class="details">{{ e.details }}</td>
+            <td class="nowrap" data-label="When">{{ e.time | date: 'd MMM y, HH:mm' }}</td>
+            <td data-label="Person">{{ e.person }}</td>
+            <td data-label="Action"><span class="chip" [ngClass]="actionGroup(e.action)">{{ actionLabel(e.action) }}</span></td>
+            <td class="item" data-label="Item">{{ e.target }}</td>
+            <td class="details" data-label="Details">{{ e.details }}</td>
           </tr>
         </tbody>
       </table>

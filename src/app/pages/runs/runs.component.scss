@@ -203,3 +203,37 @@ tr.bad td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+/* ---------- Phones: turn table rows into cards ---------- */
+@media (max-width: 700px) {
+  .table-wrap { overflow-x: visible; background: transparent; border: 0; box-shadow: none; }
+  table { min-width: 0; width: 100%; }
+  table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table,
+  table tbody,
+  table tr,
+  table td { display: block; width: 100%; box-sizing: border-box; }
+  table tr {
+    background: #fff; border: 1px solid var(--border, #e2e8f0); border-radius: 14px;
+    padding: 0.4rem 0.9rem; margin-bottom: 0.8rem;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  }
+  table tbody tr:last-child td { border-bottom: 0; }
+  table td {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.5rem 0; border: 0; border-bottom: 1px dashed var(--border, #e2e8f0);
+    text-align: right; min-width: 0; white-space: normal;
+  }
+  table td::before {
+    content: attr(data-label); flex: none; text-align: left;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b;
+  }
+  table td:first-child { display: block; text-align: left; font-weight: 600; }
+  table td:first-child::before { display: none; }
+  table td.act, table td.right, table td:last-child[data-label="Actions"], table td:last-child[data-label="Steps"] {
+    display: flex; justify-content: flex-start; flex-wrap: wrap; border-bottom: 0;
+  }
+  table td.act::before, table td.right::before, table td[data-label="Actions"]::before, table td[data-label="Steps"]::before { display: none; }
+  table td.details { display: block; min-width: 0; text-align: left; }
+  table td.details::before { display: block; margin-bottom: 0.15rem; }
+  table tr.bad { border-left: 4px solid var(--danger, #dc2626); }
+}

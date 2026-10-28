@@ -56,13 +56,13 @@
         </thead>
         <tbody>
           <tr *ngFor="let r of pageItems; trackBy: trackById" [class.bad]="r.status === 'failed'">
-            <td class="nowrap">{{ r.time | date: 'd MMM y, shortTime' }}</td>
-            <td><strong>{{ r.agent }}</strong></td>
-            <td>{{ r.person }}</td>
-            <td><span class="status" [ngClass]="r.status">{{ statusText(r.status) }}</span></td>
-            <td class="num">{{ duration(r.durationSec) }}</td>
-            <td class="num">${{ r.cost | number: '1.3-3' }}</td>
-            <td class="act">
+            <td class="nowrap" data-label="Time">{{ r.time | date: 'd MMM y, h:mm a' }}</td>
+            <td data-label="Agent"><strong>{{ r.agent }}</strong></td>
+            <td data-label="Person">{{ r.person }}</td>
+            <td data-label="Status"><span class="status" [ngClass]="r.status">{{ statusText(r.status) }}</span></td>
+            <td class="num" data-label="Duration">{{ duration(r.durationSec) }}</td>
+            <td class="num" data-label="Cost">${{ r.cost | number: '1.3-3' }}</td>
+            <td class="act" data-label="Steps">
               <button type="button" class="btn small outline" (click)="openRun(r)">View</button>
             </td>
           </tr>
@@ -87,7 +87,7 @@
     <div class="panel-head">
       <div>
         <h2 id="rnTitle">{{ selected.agent }}</h2>
-        <div class="sub">{{ selected.time | date: 'd MMM y, shortTime' }} &middot; {{ selected.person }}</div>
+        <div class="sub">{{ selected.time | date: 'd MMM y, h:mm a' }} &middot; {{ selected.person }}</div>
       </div>
       <button type="button" class="icon-btn" aria-label="Close" (click)="closeRun()">&times;</button>
     </div>

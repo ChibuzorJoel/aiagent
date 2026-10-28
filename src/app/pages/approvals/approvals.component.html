@@ -61,7 +61,7 @@
         <span>Asked by {{ a.requestedBy }}</span>
         <span *ngIf="a.status === 'pending'">Waiting {{ waited(a.createdAt) }}</span>
         <span *ngIf="a.status !== 'pending' && a.decidedAt">
-          {{ a.status === 'approved' ? 'Approved' : 'Rejected' }} by {{ a.decidedBy }} on {{ a.decidedAt | date: 'd MMM y, shortTime' }}
+          {{ a.status === 'approved' ? 'Approved' : 'Rejected' }} by {{ a.decidedBy }} on {{ a.decidedAt | date: 'd MMM y, h:mm a' }}
         </span>
       </div>
 

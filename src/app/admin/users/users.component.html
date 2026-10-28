@@ -63,19 +63,19 @@
         </thead>
         <tbody>
           <tr *ngFor="let u of pageItems; trackBy: trackById" [class.off]="!u.active">
-            <td>
+            <td data-label="Name">
               <div class="name">{{ u.name }} <span class="you" *ngIf="isSelf(u)">(you)</span></div>
               <div class="mail">{{ u.email }}</div>
             </td>
-            <td>{{ u.phone || '-' }}</td>
-            <td><span class="chip" [ngClass]="u.role">{{ u.role | titlecase }}</span></td>
-            <td>
+            <td data-label="Phone">{{ u.phone || '-' }}</td>
+            <td data-label="Role"><span class="chip" [ngClass]="u.role">{{ u.role | titlecase }}</span></td>
+            <td data-label="Status">
               <span class="status" [ngClass]="u.active ? 'active' : 'inactive'">
                 {{ u.active ? '✔ Active' : '✖ Deactivated' }}
               </span>
             </td>
-            <td>{{ u.lastActive ? (u.lastActive | date: 'd MMM y, shortTime') : 'Never' }}</td>
-            <td class="act">
+            <td data-label="Last active">{{ u.lastActive ? (u.lastActive | date: 'd MMM y, h:mm a') : 'Never' }}</td>
+            <td class="act" data-label="Actions">
               <button type="button" class="btn small outline" (click)="openEdit(u)">Edit</button>
               <button type="button" class="btn small" [ngClass]="u.active ? 'danger' : 'outline'"
                       (click)="askToggle(u)" [disabled]="isSelf(u)"
