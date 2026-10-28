@@ -12,6 +12,11 @@ const { startRetention } = require('./utils/retention');
 const app = express();
 
 app.use(helmet());
+
+// Never let the browser reuse old API answers (a cached 304 can leave lists empty)
+app.set('etag', false);
+app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
 app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
