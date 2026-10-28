@@ -25,7 +25,7 @@ interface VerifyResponse {
   user: { id: string; name: string; email: string; phone?: string };
 }
 
-/** Shape returned by GET /auth/me and POST /auth/me/save */
+/** Shape returned by GET /auth/me and POST /auth/profile */
 interface MeResponse {
   id: string;
   name: string;
@@ -309,7 +309,7 @@ export class AccountComponent implements OnInit, OnDestroy {
     );
   }
 
-  /** POST /auth/me/save { name, phone } */
+  /** POST /auth/profile { name, phone } */
   saveProfile(event: Event, rawName: string, rawPhone: string): void {
     event.preventDefault();
     if (this.busy) { return; }
@@ -329,7 +329,7 @@ export class AccountComponent implements OnInit, OnDestroy {
 
     this.busy = true;
     this.subs.add(
-      this.http.post<MeResponse>(`${API_URL}/auth/me/save`, { name, phone }, { headers: this.authHeaders() }).subscribe({
+      this.http.post<MeResponse>(`${API_URL}/auth/profile`, { name, phone }, { headers: this.authHeaders() }).subscribe({
         next: me => {
           this.busy = false;
           this.profile = { name: me.name || name, email: me.email || this.profile.email, phone: me.phone || '' };

@@ -237,4 +237,4 @@ async function resumeAfterDecision({ approval, approved, reason }) {
   return drive({ run, agent, user });
 }
 
-module.exports = { drive, resumeAfterDecision, msgDto, approvalDto };
+module.exports = { drive, resumeAfterDecision, msgDto, approvalDto, buildSystem };

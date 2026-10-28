@@ -8,6 +8,7 @@ router.get('/get', ctrl.get);
 router.post('/create', requireRole('builder', 'admin'), ctrl.create);
 router.post('/update', requireRole('builder', 'admin'), ctrl.update);
 router.post('/publish', requireRole('builder', 'admin'), ctrl.publish);
+router.post('/test', requireRole('builder', 'admin'), ctrl.test);
 router.post('/delete', requireRole('builder', 'admin'), ctrl.remove);
 
 module.exports = router;
