@@ -36,7 +36,7 @@ interface MeResponse {
 
 // Base URL of the API (matches PORT in the backend .env). Move this to
 // environment.ts (environment.apiUrl) when you have one.
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://aiagent-rnhq.onrender.com';
 
 @Component({
   selector: 'app-account',

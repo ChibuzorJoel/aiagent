@@ -1,2 +1,2 @@
 // Where the Node backend runs. Change this for production.
-export const API_URL = 'http://localhost:3000';
+export const API_URL = 'https://aiagent-rnhq.onrender.com';
