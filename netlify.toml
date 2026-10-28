@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "dist/aiagent"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Lets Angular handle page refreshes on routes like /chat and /agents
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
