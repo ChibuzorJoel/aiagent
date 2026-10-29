@@ -37,6 +37,7 @@ function toOllamaMessages(system, messages) {
  * onText(chunk) is called for every piece of text as it arrives.
  */
 async function chatStream({ model, system, messages, tools, signal, onText }) {
+  if (process.env.GROQ_API_KEY) return require('./groq').chatStream({ system, messages, tools, signal, onText });
   const body = {
     model,
     stream: true,
