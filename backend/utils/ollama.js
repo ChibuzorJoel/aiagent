@@ -40,8 +40,10 @@ async function chatStream({ model, system, messages, tools, signal, onText }) {
   const body = {
     model,
     stream: true,
+    think: process.env.OLLAMA_THINK === 'true',
+    keep_alive: process.env.OLLAMA_KEEP_ALIVE || '30m',
     messages: toOllamaMessages(system, messages),
-    options: { num_ctx: Number(process.env.OLLAMA_NUM_CTX || 8192) },
+    options: { num_ctx: Number(process.env.OLLAMA_NUM_CTX || 4096) },
     ...(tools && tools.length ? {
       tools: tools.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
     } : {})
