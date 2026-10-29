@@ -1,5 +1,8 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 
 type Role = 'member' | 'builder' | 'admin';
 
@@ -22,17 +25,19 @@ interface ToolInfo {
   styleUrls: ['./limits.component.scss']
 })
 export class LimitsComponent implements OnInit, OnDestroy {
-  readonly retentionOptions = [30, 90, 180, 365];
+  retentionOptions = [30, 90, 180, 365];
 
-  // Same tools as the Tools page. Replace with the list from GET /tool/list if you want it dynamic.
-  readonly tools: ToolInfo[] = [
-    { key: 'search_kb',     name: 'Search the knowledge base', desc: 'Reads the documents attached to an agent. No side effects.' },
-    { key: 'read_db',       name: 'Read the database',         desc: 'Looks up records. No side effects.' },
-    { key: 'send_email',    name: 'Send e-mail',               desc: 'Sends a message to someone outside the system.' },
-    { key: 'create_record', name: 'Create a record',           desc: 'Adds a new record to the database.' },
-    { key: 'update_record', name: 'Update a record',           desc: 'Changes an existing record.' },
-    { key: 'delete_record', name: 'Delete a record',           desc: 'Removes a record permanently.' },
-  ];
+  // Filled from GET /limits/get (the same tools the server knows about)
+  tools: ToolInfo[] = [];
+
+  private readonly toolDesc: { [key: string]: string } = {
+    search_knowledge: 'Reads the documents attached to an agent. No side effects.',
+    get_current_time: 'Tells the agent the current date and time. No side effects.',
+    send_email:       'Sends a message to someone outside the system.',
+    create_record:    'Adds a new record to the database.'
+  };
+
+  private alwaysApprove: string[] = [];   // kept as the server has them, so saving does not wipe them
 
   saved: LimitSettings | null = null;     // what the server has
   blocked: string[] = [];                 // working copy of the ticked tools
@@ -49,7 +54,9 @@ export class LimitsComponent implements OnInit, OnDestroy {
   private timers: number[] = [];
   private noticeTimer: number | null = null;
 
-  constructor(private router: Router) {}
+  private sub?: Subscription;
+
+  constructor(private router: Router, private api: ApiService) {}
 
   // ---- Session ---------------------------------------------------------
   get signedIn(): boolean {
@@ -79,24 +86,49 @@ export class LimitsComponent implements OnInit, OnDestroy {
     this.timers.forEach(id => window.clearTimeout(id));
     this.timers = [];
     if (this.noticeTimer !== null) { window.clearTimeout(this.noticeTimer); }
+    this.sub?.unsubscribe();
   }
 
   // ---- Loading ---------------------------------------------------------
-  /**
-   * REPLACE with GET /limit/get.
-   * On { code: 'auth' } navigate to /account; on any other error set this.error and loading = false.
-   */
+  /** GET /limits/get (and this month's cost from GET /usage/summary) */
   load(): void {
     if (this.loading) { return; }
     this.loading = true;
     this.error = '';
 
-    this.later(() => {
-      this.saved = { monthlyCap: 500, dailyMessages: 100, retentionDays: 90, blockedTools: ['delete_record'] };
-      this.blocked = this.saved.blockedTools.slice();
-      this.monthCost = 412.4;
-      this.loading = false;
-    }, 600);
+    this.sub?.unsubscribe();
+    this.sub = this.api.limits().subscribe({
+      next: (r: any) => {
+        const L = r.limits || {};
+        this.tools = (r.tools || []).map((t: any): ToolInfo => ({
+          key: t.key, name: t.name, desc: this.toolDesc[t.key] || 'An action agents can take.'
+        }));
+        this.applyLimits(L);
+        this.alwaysApprove = (L.alwaysApproveTools || []).slice();
+        this.loading = false;
+
+        // the cost so far this month is only for the notice after saving; a failure here is not important
+        this.api.usage(7).subscribe({ next: (u: any) => { this.monthCost = u.monthCost || 0; }, error: () => {} });
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.error = e.message;      // an expired session is handled by the interceptor
+      }
+    });
+  }
+
+  private applyLimits(L: any): void {
+    const days = L.retentionDays || 90;
+    if (this.retentionOptions.indexOf(days) === -1) {
+      this.retentionOptions = [...this.retentionOptions, days].sort((a, b) => a - b);
+    }
+    this.saved = {
+      monthlyCap: L.monthlyCostCap || 0,
+      dailyMessages: L.dailyMessageCap || 0,
+      retentionDays: days,
+      blockedTools: (L.blockedTools || []).slice()
+    };
+    this.blocked = this.saved.blockedTools.slice();
   }
 
   // ---- Blocked tools ---------------------------------------------------
@@ -111,7 +143,7 @@ export class LimitsComponent implements OnInit, OnDestroy {
   }
 
   // ---- Save / discard --------------------------------------------------
-  /** REPLACE with POST /limit/save { monthlyCap, dailyMessages, retentionDays, blockedTools } */
+  /** POST /limits/save */
   save(event: Event, rawCap: string, rawDaily: string, rawRetention: string): void {
     event.preventDefault();
     if (this.saving || !this.saved) { return; }
@@ -142,15 +174,28 @@ export class LimitsComponent implements OnInit, OnDestroy {
     };
 
     this.saving = true;
-    this.later(() => {
-      this.saved = next;
-      this.saving = false;
-      this.showNotice(
-        next.monthlyCap < this.monthCost
-          ? 'Saved. The new cap is below this month\'s cost, so agents will stop until next month.'
-          : 'Limits and policies saved.'
-      );
-    }, 600);
+    this.api.saveLimits({
+      monthlyCostCap: next.monthlyCap,
+      dailyMessageCap: next.dailyMessages,
+      retentionDays: next.retentionDays,
+      blockedTools: next.blockedTools,
+      alwaysApproveTools: this.alwaysApprove
+    }).subscribe({
+      next: (r: any) => {
+        this.applyLimits(r.limits || {});
+        this.alwaysApprove = ((r.limits && r.limits.alwaysApproveTools) || this.alwaysApprove).slice();
+        this.saving = false;
+        this.showNotice(
+          next.monthlyCap < this.monthCost
+            ? 'Saved. The new cap is below this month\'s cost, so agents will stop until next month.'
+            : 'Limits and policies saved.'
+        );
+      },
+      error: (e: ApiError) => {
+        this.saving = false;
+        this.formError = e.message;
+      }
+    });
   }
 
   /** Puts the saved values back into the fields and the tool list. */
@@ -177,11 +222,4 @@ export class LimitsComponent implements OnInit, OnDestroy {
     }, 4000);
   }
 
-  private later(fn: () => void, ms: number): void {
-    const id = window.setTimeout(() => {
-      this.timers = this.timers.filter(t => t !== id);
-      fn();
-    }, ms);
-    this.timers.push(id);
-  }
 }

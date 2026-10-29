@@ -1,5 +1,8 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 
 type Role = 'member' | 'builder' | 'admin';
 type LimitState = 'ok' | 'warn' | 'danger';
@@ -37,8 +40,9 @@ export class UsageComponent implements OnInit, OnDestroy {
   readonly skeletons = [1, 2, 3];
 
   private timers: number[] = [];
+  private sub?: Subscription;
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private api: ApiService) {}
 
   // ---- Getters ---------------------------------------------------------
   get signedIn(): boolean {
@@ -98,22 +102,46 @@ export class UsageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.timers.forEach(id => window.clearTimeout(id));
     this.timers = [];
+    this.sub?.unsubscribe();
   }
 
   // ---- Loading ---------------------------------------------------------
-  /**
-   * REPLACE with GET /usage/summary?days=<rangeDays>
-   * On { code: 'auth' } navigate to /account; on any other error set this.error and loading = false.
-   */
+  /** GET /usage/summary?days=<rangeDays> */
   load(): void {
     if (this.loading) { return; }
     this.loading = true;
     this.error = '';
 
-    this.later(() => {
-      this.buildMock(this.rangeDays);
-      this.loading = false;
-    }, 500);
+    this.sub?.unsubscribe();
+    this.sub = this.api.get('/usage/summary', { days: this.rangeDays }).subscribe({
+      next: (r: any) => {
+        this.days = (r.days || []).map((d: any): DayUsage => ({
+          date: new Date(d.date + 'T00:00:00'), messages: d.messages || 0, cost: d.cost || 0
+        }));
+        this.byAgent = this.toRows(r.byAgent || []);
+        this.byPerson = this.toRows(r.byPerson || []);
+        this.monthCost = r.monthCost || 0;
+        this.monthLimit = r.monthlyCostCap || 0;
+        this.loading = false;
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.error = e.message;      // an expired session is handled by the interceptor
+      }
+    });
+  }
+
+  /** The share is of the total cost (or of the messages while everything is free). */
+  private toRows(list: any[]): UsageRow[] {
+    const totalCost = list.reduce((s, x) => s + (x.cost || 0), 0);
+    const totalMsg = list.reduce((s, x) => s + (x.messages || 0), 0);
+    return list.map((x: any): UsageRow => ({
+      name: x.name,
+      messages: x.messages || 0,
+      cost: x.cost || 0,
+      share: totalCost > 0 ? Math.round(((x.cost || 0) / totalCost) * 100)
+           : totalMsg > 0 ? Math.round(((x.messages || 0) / totalMsg) * 100) : 0
+    }));
   }
 
   onRange(value: string): void {
@@ -137,56 +165,4 @@ export class UsageComponent implements OnInit, OnDestroy {
     return index % step === 0 || index === this.days.length - 1;
   }
 
-  private later(fn: () => void, ms: number): void {
-    const id = window.setTimeout(() => {
-      this.timers = this.timers.filter(t => t !== id);
-      fn();
-    }, ms);
-    this.timers.push(id);
-  }
-
-  // ---- MOCK DATA (remove when connected to the backend) -------------------
-  private buildMock(range: number): void {
-    const days: DayUsage[] = [];
-    for (let i = range - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - i);
-
-      const weekend = date.getDay() === 0 || date.getDay() === 6;
-      const base = 45 + ((date.getDate() * 37) % 55);
-      const messages = weekend ? Math.round(base / 3) : base;
-      days.push({ date, messages, cost: messages * 0.0125 });
-    }
-    this.days = days;
-
-    const totalMsg = this.totalMessages;
-    const totalCost = this.totalCost;
-
-    this.byAgent = this.split(totalMsg, totalCost, [
-      ['Sales Assistant', 0.5],
-      ['HR Guide', 0.3],
-      ['Office Helper', 0.2],
-    ]);
-
-    this.byPerson = this.split(totalMsg, totalCost, [
-      ['Ada Obi', 0.35],
-      ['Tunde Bello', 0.25],
-      ['Chika Eze', 0.2],
-      ['Ngozi Okafor', 0.12],
-      ['Ibrahim Musa', 0.08],
-    ]);
-
-    this.monthCost = 412.4;
-    this.monthLimit = 500;
-  }
-
-  private split(totalMsg: number, totalCost: number, parts: Array<[string, number]>): UsageRow[] {
-    return parts.map(p => ({
-      name: p[0],
-      messages: Math.round(totalMsg * p[1]),
-      cost: totalCost * p[1],
-      share: Math.round(p[1] * 100)
-    }));
-  }
 }

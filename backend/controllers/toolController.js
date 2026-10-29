@@ -6,13 +6,18 @@ const { wrap, fail } = require('../utils/http');
 
 // GET /tools/list
 exports.list = wrap(async (req, res) => {
-  const [connected, limits] = await Promise.all([connectedKeys(), getLimits()]);
+  const [connected, limits, usage] = await Promise.all([
+    connectedKeys(), getLimits(),
+    require('../models/Agent').aggregate([{ $unwind: '$tools' }, { $group: { _id: '$tools.key', n: { $sum: 1 } } }])
+  ]);
+  const used = new Map(usage.map(u => [u._id, u.n]));
   res.json({
     tools: Object.values(TOOLS).map(t => ({
       key: t.key, name: t.name, description: t.description, readOnly: t.readOnly,
       needsApproval: !t.readOnly || limits.alwaysApproveTools.includes(t.key),
       blocked: limits.blockedTools.includes(t.key),
-      connected: connected.has(t.key)
+      connected: connected.has(t.key),
+      usedBy: used.get(t.key) || 0
     }))
   });
 });

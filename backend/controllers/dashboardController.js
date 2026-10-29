@@ -21,6 +21,9 @@ exports.dashboard = wrap(async (req, res) => {
     Agent.find({ status: 'published' }).sort({ updatedAt: -1 }).limit(6).select('name purpose color').lean()
   ]);
 
+  const colorRows = await Agent.find({ _id: { $in: recent.map(c => c.agentId) } }).select('color').lean();
+  const colors = new Map(colorRows.map(a => [String(a._id), a.color]));
+
   let costThisMonth = null; // builders and admins only
   if (isBuilder(u)) {
     const [row] = await Run.aggregate([
@@ -33,7 +36,7 @@ exports.dashboard = wrap(async (req, res) => {
   res.json({
     greeting: { name: u.name, date: new Date().toISOString() },
     stats: { chatsThisWeek, agentsAvailable, waitingForApproval: waiting, costThisMonth },
-    recentConversations: recent.map(c => ({ id: c._id, title: c.title, agentName: c.agentName, updatedAt: c.updatedAt })),
+    recentConversations: recent.map(c => ({ id: c._id, title: c.title, agentName: c.agentName, color: colors.get(String(c.agentId)) || '#4338ca', updatedAt: c.updatedAt })),
     agents: agents.map(a => ({ id: a._id, name: a.name, purpose: a.purpose, color: a.color }))
   });
 });

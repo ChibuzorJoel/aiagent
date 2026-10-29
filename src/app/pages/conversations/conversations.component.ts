@@ -1,5 +1,8 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 
 interface Conversation {
   id: string;
@@ -29,13 +32,8 @@ export class ConversationsComponent implements OnInit, OnDestroy {
   filtered: Conversation[] = [];
   paged: Conversation[] = [];
 
-  // Same ids and names as the Home, Chat and Agents pages.
-  // Replace with GET /agent/list when you connect the backend.
-  agentOptions: AgentOption[] = [
-    { id: 'a1', name: 'Sales Assistant' },
-    { id: 'a2', name: 'Office Helper' },
-    { id: 'a3', name: 'HR Guide' },
-  ];
+  // Filled from GET /agents/list
+  agentOptions: AgentOption[] = [];
 
   // Filters + paging
   searchText = '';
@@ -54,7 +52,9 @@ export class ConversationsComponent implements OnInit, OnDestroy {
   private toastTimer: number | null = null;
   private loadTimer: number | null = null;
 
-  constructor(private router: Router) {}
+  private listSub?: Subscription;
+
+  constructor(private router: Router, private api: ApiService) {}
 
   // ---- Getters ----------------------------------------------------------
   get hasFilters(): boolean {
@@ -74,47 +74,40 @@ export class ConversationsComponent implements OnInit, OnDestroy {
     this.clearTimer(this.searchTimer);
     this.clearTimer(this.toastTimer);
     this.clearTimer(this.loadTimer);
+    this.listSub?.unsubscribe();
   }
 
-  /**
-   * Replace the body with the real call: GET /conversation/list
-   * (the server must return only the signed-in person's own conversations).
-   * Always set this.loading = false, also on error. On { code: 'auth' } go to /account.
-   */
+  /** GET /conversations/list (the server returns only this person's own conversations) and GET /agents/list */
   load(): void {
     this.loading = true;
-    this.loadTimer = window.setTimeout(() => {
-      this.loadTimer = null;
-      this.conversations = this.seed();
-      this.loading = false;
-      this.refresh();
-    }, 500);
-  }
+    this.listSub?.unsubscribe();
 
-  private seed(): Conversation[] {
-    const now = Date.now();
-    const hour = 3600000;
-    const day = 24 * hour;
-    return [
-      { id: 'c1', title: "Summarise last week's enquiries", agentId: 'a1', agentName: 'Sales Assistant', color: '#14b8a6',
-        lastMessage: 'Here is the summary of last week\'s enquiries.', messageCount: 6, updatedAt: new Date(now - 2 * hour) },
-      { id: 'c2', title: 'Draft a reply to the supplier', agentId: 'a2', agentName: 'Office Helper', color: '#4338ca',
-        lastMessage: 'I have prepared the email for you.', messageCount: 4, updatedAt: new Date(now - 1 * day) },
-      { id: 'c3', title: 'Find the leave policy', agentId: 'a3', agentName: 'HR Guide', color: '#0f766e',
-        lastMessage: 'Staff may take up to 20 days of annual leave.', messageCount: 3, updatedAt: new Date(now - 3 * day) },
-      { id: 'c4', title: 'Price list for new customers', agentId: 'a1', agentName: 'Sales Assistant', color: '#14b8a6',
-        lastMessage: 'The updated price list is in the attached document.', messageCount: 8, updatedAt: new Date(now - 4 * day) },
-      { id: 'c5', title: 'Meeting notes summary', agentId: 'a2', agentName: 'Office Helper', color: '#4338ca',
-        lastMessage: 'Three action points were agreed.', messageCount: 5, updatedAt: new Date(now - 6 * day) },
-      { id: 'c6', title: 'Onboarding checklist', agentId: 'a3', agentName: 'HR Guide', color: '#0f766e',
-        lastMessage: 'Here is the checklist for a new starter.', messageCount: 7, updatedAt: new Date(now - 9 * day) },
-      { id: 'c7', title: 'Follow up with open leads', agentId: 'a1', agentName: 'Sales Assistant', color: '#14b8a6',
-        lastMessage: 'Five leads have not replied in over a week.', messageCount: 10, updatedAt: new Date(now - 12 * day) },
-      { id: 'c8', title: 'Rewrite the welcome message', agentId: 'a2', agentName: 'Office Helper', color: '#4338ca',
-        lastMessage: 'Here is a friendlier version.', messageCount: 2, updatedAt: new Date(now - 15 * day) },
-      { id: 'c9', title: 'Public holiday dates', agentId: 'a3', agentName: 'HR Guide', color: '#0f766e',
-        lastMessage: 'The office is closed on these dates.', messageCount: 2, updatedAt: new Date(now - 20 * day) },
-    ];
+    this.listSub = this.api.get('/conversations/list', { pageSize: 100 }).subscribe({
+      next: (r: any) => {
+        this.conversations = (r.conversations || []).map((c: any): Conversation => ({
+          id: c.id,
+          title: c.title,
+          agentId: c.agentId,
+          agentName: c.agentName,
+          color: c.color || '#4338ca',
+          lastMessage: c.lastMessage || '',
+          messageCount: c.messageCount || 0,
+          updatedAt: new Date(c.updatedAt)
+        }));
+
+        // the agents in the filter: the ones that appear in the conversations
+        const seen = new Map<string, string>();
+        this.conversations.forEach(c => { if (!seen.has(c.agentId)) { seen.set(c.agentId, c.agentName); } });
+        this.agentOptions = Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+
+        this.loading = false;
+        this.refresh();
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.showToast(e.message, 'error');
+      }
+    });
   }
 
   // ---- Filtering, sorting, paging ----------------------------------------
@@ -201,7 +194,7 @@ export class ConversationsComponent implements OnInit, OnDestroy {
     this.renameError = '';
   }
 
-  /** Replace with POST /conversation/rename { id, title } */
+  /** POST /conversations/rename { id, title } */
   saveRename(): void {
     const target = this.renameTarget;
     if (!target) { return; }
@@ -212,10 +205,15 @@ export class ConversationsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    target.title = title.slice(0, 80);
-    this.cancelRename();
-    this.refresh();
-    this.showToast('Conversation renamed.', 'ok');
+    this.api.renameConversation(target.id, title.slice(0, 80)).subscribe({
+      next: (r: any) => {
+        target.title = (r && r.title) || title.slice(0, 80);
+        this.cancelRename();
+        this.refresh();
+        this.showToast('Conversation renamed.', 'ok');
+      },
+      error: (e: ApiError) => { this.renameError = e.message; }
+    });
   }
 
   // ---- Delete ------------------------------------------------------------------
@@ -227,15 +225,20 @@ export class ConversationsComponent implements OnInit, OnDestroy {
     this.deleteTarget = null;
   }
 
-  /** Replace with POST /conversation/delete { id } */
+  /** POST /conversations/delete { id } */
   confirmDelete(): void {
     const target = this.deleteTarget;
     if (!target) { return; }
-
-    this.conversations = this.conversations.filter(c => c.id !== target.id);
     this.deleteTarget = null;
-    this.refresh();
-    this.showToast('Conversation deleted.', 'ok');
+
+    this.api.deleteConversation(target.id).subscribe({
+      next: () => {
+        this.conversations = this.conversations.filter(c => c.id !== target.id);
+        this.refresh();
+        this.showToast('Conversation deleted.', 'ok');
+      },
+      error: (e: ApiError) => this.showToast(e.message, 'error')
+    });
   }
 
   @HostListener('document:keydown.escape')

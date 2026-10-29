@@ -5,9 +5,9 @@ const { wrap } = require('../utils/http');
 
 const round = n => Math.round(n * 10000) / 10000;
 
-// GET /usage/summary?days=7|30|90
+// GET /usage/summary?days=7|14|30|90
 exports.summary = wrap(async (req, res) => {
-  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+  const days = [7, 14, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
   const since = new Date(); since.setUTCHours(0, 0, 0, 0); since.setUTCDate(since.getUTCDate() - (days - 1));
 
   const scope = await runScope(req.user);

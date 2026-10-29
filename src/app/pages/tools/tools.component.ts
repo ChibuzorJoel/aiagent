@@ -1,5 +1,8 @@
 
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 
 interface ToolTest {
   ok: boolean;
@@ -38,6 +41,9 @@ export class ToolsComponent implements OnInit, OnDestroy {
   private toastTimer: number | null = null;
   private loadTimer: number | null = null;
   private timers: number[] = [];
+  private listSub?: Subscription;
+
+  constructor(private api: ApiService) {}
 
   // ---- Session (swap for your RolesService when ready) -----------------
   // Cosmetic only: the server must check the role on every request.
@@ -63,62 +69,67 @@ export class ToolsComponent implements OnInit, OnDestroy {
     if (this.loadTimer !== null) { window.clearTimeout(this.loadTimer); }
     this.timers.forEach(t => window.clearTimeout(t));
     this.timers = [];
+    this.listSub?.unsubscribe();
   }
 
-  /**
-   * Replace the body with the real call: GET /tool/list
-   * Always set this.loading = false (also on error). On { code: 'auth' } go to /account.
-   */
+  /** GET /tools/list */
   load(): void {
     this.loading = true;
-    this.loadTimer = window.setTimeout(() => {
-      this.loadTimer = null;
-      this.tools = this.seed();
-      this.loading = false;
-    }, 500);
+    this.listSub?.unsubscribe();
+    this.listSub = this.api.tools().subscribe({
+      next: (r: any) => {
+        this.tools = (r.tools || []).map((t: any) => this.toTool(t));
+        this.loading = false;
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.showToast(e.message, 'error');
+      }
+    });
   }
 
-  // Same ids and names as the Agents page (t1 to t4). usedBy matches the sample agents there.
-  private seed(): Tool[] {
-    return [
-      {
-        id: 't1', name: 'Search the knowledge base', icon: '🔎', sideEffects: false,
-        description: 'Finds answers inside the documents an agent is allowed to read.',
-        abilities: ['Searches all ticked documents and web pages', 'Returns the passages it used, with the source name'],
-        connected: true, usedBy: 2, busy: false, testing: false, lastTest: null
-      },
-      {
-        id: 't2', name: 'Read the database', icon: '🗄️', sideEffects: false,
-        description: 'Looks up records. It can only read, never change anything.',
-        abilities: ['Reads enquiries, customers and orders', 'Read-only access'],
-        connected: true, usedBy: 1, busy: false, testing: false, lastTest: null
-      },
-      {
-        id: 't3', name: 'Send e-mail', icon: '✉️', sideEffects: true,
-        description: 'Sends a message to a person outside the system.',
-        abilities: ['Sends an e-mail on behalf of the agent', 'Always shows you the message before it is sent'],
-        connected: true, usedBy: 2, busy: false, testing: false, lastTest: null
-      },
-      {
-        id: 't4', name: 'Create a record', icon: '📝', sideEffects: true,
-        description: 'Adds a new record to the database.',
-        abilities: ['Creates enquiries, notes and tasks', 'Shows the new record before it is saved'],
-        connected: false, usedBy: 0, busy: false, testing: false, lastTest: null
-      },
-    ];
+  // How each tool looks on the page (the server only knows the name and the rules)
+  private readonly look: { [key: string]: { icon: string; abilities: string[] } } = {
+    search_knowledge: { icon: '🔎', abilities: ['Searches all ticked documents and web pages', 'Returns the passages it used, with the source name'] },
+    get_current_time: { icon: '🕒', abilities: ['Tells the agent the current date and time', 'Read-only, no side effects'] },
+    send_email:       { icon: '✉️', abilities: ['Sends an e-mail on behalf of the agent', 'Asks for approval before it is sent'] },
+    create_record:    { icon: '📝', abilities: ['Creates notes, enquiries and tasks', 'Asks for approval before it is saved'] }
+  };
+
+  private toTool(t: any): Tool {
+    const look = this.look[t.key] || { icon: '🧩', abilities: [t.readOnly ? 'Read-only, no side effects' : 'Changes or sends data, so it asks for approval'] };
+    return {
+      id: t.key,
+      name: t.name,
+      description: t.description,
+      abilities: look.abilities,
+      icon: look.icon,
+      sideEffects: !t.readOnly,
+      connected: !!t.connected,
+      usedBy: t.usedBy || 0,
+      busy: false,
+      testing: false,
+      lastTest: null
+    };
   }
 
   // ---- Connect ---------------------------------------------------------------
-  /** Replace the simulation with POST /tool/connect { id } */
+  /** POST /tools/connect { key } */
   connect(t: Tool): void {
     if (t.busy) { return; }
     t.busy = true;
 
-    this.later(() => {
-      t.connected = true;
-      t.busy = false;
-      this.showToast(t.name + ' connected.', 'ok');
-    }, 700);
+    this.api.connectTool(t.id).subscribe({
+      next: () => {
+        t.connected = true;
+        t.busy = false;
+        this.showToast(t.name + ' connected.', 'ok');
+      },
+      error: (e: ApiError) => {
+        t.busy = false;
+        this.showToast(e.message, 'error');
+      }
+    });
   }
 
   // ---- Disconnect ------------------------------------------------------------
@@ -130,19 +141,25 @@ export class ToolsComponent implements OnInit, OnDestroy {
     this.disconnectTarget = null;
   }
 
-  /** Replace the simulation with POST /tool/disconnect { id } */
+  /** POST /tools/disconnect { key } */
   confirmDisconnect(): void {
     const t = this.disconnectTarget;
     if (!t) { return; }
     this.disconnectTarget = null;
     t.busy = true;
 
-    this.later(() => {
-      t.connected = false;
-      t.busy = false;
-      t.lastTest = null;
-      this.showToast(t.name + ' disconnected.', 'ok');
-    }, 500);
+    this.api.disconnectTool(t.id).subscribe({
+      next: () => {
+        t.connected = false;
+        t.busy = false;
+        t.lastTest = null;
+        this.showToast(t.name + ' disconnected.', 'ok');
+      },
+      error: (e: ApiError) => {
+        t.busy = false;
+        this.showToast(e.message, 'error');
+      }
+    });
   }
 
   @HostListener('document:keydown.escape')
@@ -153,29 +170,21 @@ export class ToolsComponent implements OnInit, OnDestroy {
   }
 
   // ---- Test -------------------------------------------------------------------
-  /**
-   * Replace the simulation with POST /tool/test { id } and show the result it returns.
-   * Tools with side effects must run as a dry run on the server, so testing never
-   * sends or changes anything. On error set lastTest = { ok: false, text: <message>, at: new Date() }.
-   */
+  /** POST /tools/test { key }: a dry run, so nothing is sent or changed. */
   test(t: Tool): void {
     if (!t.connected || t.testing || t.busy) { return; }
     t.testing = true;
 
-    this.later(() => {
-      t.lastTest = this.mockResult(t);
-      t.testing = false;
-    }, 1100);
-  }
-
-  private mockResult(t: Tool): ToolTest {
-    const at = new Date();
-    switch (t.id) {
-      case 't1': return { ok: true, at, text: 'Found 3 matching passages across 4 documents (0.9 s).' };
-      case 't2': return { ok: true, at, text: 'Connected. Read 12 records from the enquiries table (read-only).' };
-      case 't3': return { ok: true, at, text: 'Test message prepared. Nothing was sent.' };
-      default:   return { ok: true, at, text: 'Dry run passed. No record was created.' };
-    }
+    this.api.testTool(t.id).subscribe({
+      next: (r: any) => {
+        t.lastTest = { ok: !!r.ok, text: String(r.result || (r.ok ? 'Test passed.' : 'Test failed.')), at: new Date() };
+        t.testing = false;
+      },
+      error: (e: ApiError) => {
+        t.lastTest = { ok: false, text: e.message, at: new Date() };
+        t.testing = false;
+      }
+    });
   }
 
   // ---- Helpers -----------------------------------------------------------------

@@ -1,5 +1,8 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 
 type Role = 'member' | 'builder' | 'admin';
 
@@ -10,7 +13,10 @@ type ActionKey =
   | 'agent_published'
   | 'agent_deleted'
   | 'knowledge_added'
+  | 'knowledge_deleted'
   | 'tool_connected'
+  | 'tool_disconnected'
+  | 'conversation_deleted'
   | 'approval_decided'
   | 'user_changed'
   | 'limit_changed';
@@ -32,7 +38,8 @@ interface AuditEntry {
 export class AuditComponent implements OnInit, OnDestroy {
   readonly actionKeys: ActionKey[] = [
     'sign_in', 'agent_created', 'agent_updated', 'agent_published', 'agent_deleted',
-    'knowledge_added', 'tool_connected', 'approval_decided', 'user_changed', 'limit_changed'
+    'knowledge_added', 'knowledge_deleted', 'tool_connected', 'tool_disconnected', 'approval_decided',
+    'conversation_deleted', 'user_changed', 'limit_changed'
   ];
 
   entries: AuditEntry[] = [];
@@ -51,8 +58,9 @@ export class AuditComponent implements OnInit, OnDestroy {
   readonly skeletons = [1, 2, 3, 4, 5, 6];
 
   private timers: number[] = [];
+  private sub?: Subscription;
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private api: ApiService) {}
 
   // ---- Session ---------------------------------------------------------
   get signedIn(): boolean {
@@ -131,23 +139,35 @@ export class AuditComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.timers.forEach(id => window.clearTimeout(id));
     this.timers = [];
+    this.sub?.unsubscribe();
   }
 
   // ---- Loading ---------------------------------------------------------
-  /**
-   * REPLACE with GET /audit/list.
-   * On { code: 'auth' } navigate to /account; on any other error set this.error and loading = false.
-   */
+  /** GET /audit/list (admins only, newest first) */
   load(): void {
     if (this.loading) { return; }
     this.loading = true;
     this.error = '';
 
-    this.later(() => {
-      this.entries = this.mockEntries();
-      this.loading = false;
-      if (this.page > this.totalPages) { this.page = this.totalPages; }
-    }, 600);
+    this.sub?.unsubscribe();
+    this.sub = this.api.audit({ limit: 1000 }).subscribe({
+      next: (r: any) => {
+        this.entries = (r.entries || []).map((e: any): AuditEntry => ({
+          id: e.id,
+          time: new Date(e.time),
+          person: e.person,
+          action: e.action,
+          target: e.target || '-',
+          details: e.details || ''
+        }));
+        this.loading = false;
+        if (this.page > this.totalPages) { this.page = this.totalPages; }
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.error = e.message;      // an expired session is handled by the interceptor
+      }
+    });
   }
 
   // ---- Filters and paging ----------------------------------------------
@@ -195,7 +215,10 @@ export class AuditComponent implements OnInit, OnDestroy {
       case 'agent_published':  return 'Agent published';
       case 'agent_deleted':    return 'Agent deleted';
       case 'knowledge_added':  return 'Document added';
+      case 'knowledge_deleted': return 'Document deleted';
       case 'tool_connected':   return 'Tool connected';
+      case 'tool_disconnected': return 'Tool disconnected';
+      case 'conversation_deleted': return 'Chat deleted';
       case 'approval_decided': return 'Approval decided';
       case 'user_changed':     return 'User changed';
       default:                 return 'Limits changed';
@@ -204,7 +227,7 @@ export class AuditComponent implements OnInit, OnDestroy {
 
   /** Only used to pick a chip colour. The label text always carries the meaning. */
   actionGroup(a: ActionKey): string {
-    if (a === 'agent_deleted') { return 'danger'; }
+    if (a === 'agent_deleted' || a === 'knowledge_deleted' || a === 'conversation_deleted') { return 'danger'; }
     if (a === 'limit_changed' || a === 'user_changed') { return 'policy'; }
     if (a === 'agent_updated' || a === 'agent_published' || a === 'tool_connected') { return 'change'; }
     return '';
@@ -215,42 +238,4 @@ export class AuditComponent implements OnInit, OnDestroy {
     return e.id;
   }
 
-  private later(fn: () => void, ms: number): void {
-    const id = window.setTimeout(() => {
-      this.timers = this.timers.filter(t => t !== id);
-      fn();
-    }, ms);
-    this.timers.push(id);
-  }
-
-  // ---- MOCK DATA (remove when connected to the backend) -------------------
-  private mockEntries(): AuditEntry[] {
-    const people = ['Ada Obi', 'Tunde Bello', 'Chika Eze', 'Ibrahim Musa'];
-    const templates: Array<{ action: ActionKey; target: string; details: string }> = [
-      { action: 'sign_in',          target: '-',                       details: 'Signed in with an e-mail code.' },
-      { action: 'agent_created',    target: 'Sales Assistant',         details: 'Created as Draft.' },
-      { action: 'knowledge_added',  target: 'Leave policy.pdf',        details: 'Uploaded and indexed.' },
-      { action: 'agent_updated',    target: 'HR Guide',                details: 'Changed the instructions.' },
-      { action: 'tool_connected',   target: 'Send e-mail',             details: 'Connected and marked "ask me first".' },
-      { action: 'agent_published',  target: 'Office Helper',           details: 'Status changed from Draft to Published.' },
-      { action: 'approval_decided', target: 'Approval p1',             details: 'Approved: send the email "Following up on your enquiry".' },
-      { action: 'user_changed',     target: 'tunde.bello@example.com', details: 'Role changed from Member to Builder.' },
-      { action: 'limit_changed',    target: 'Monthly cost cap',        details: 'Changed from $400.00 to $500.00.' },
-      { action: 'agent_deleted',    target: 'Old Test Agent',          details: 'Deleted by its owner.' },
-    ];
-
-    const rows: AuditEntry[] = [];
-    for (let i = 0; i < 36; i++) {
-      const t = templates[(i * 3) % templates.length];
-      rows.push({
-        id: 'a' + (i + 1),
-        time: new Date(Date.now() - (i * 7 * 60 + (i % 5) * 11 + 5) * 60000),
-        person: people[(i * 2) % people.length],
-        action: t.action,
-        target: t.target,
-        details: t.details
-      });
-    }
-    return rows;
-  }
 }

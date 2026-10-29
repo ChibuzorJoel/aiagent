@@ -112,6 +112,7 @@
                 <span class="nm">
                   <span class="nm-title">{{ s.name }}</span>
                   <span class="nm-sub" *ngIf="s.url">{{ s.url }}</span>
+                  <span class="nm-sub" *ngIf="s.status === 'failed' && s.error">{{ s.error }}</span>
                 </span>
               </div>
             </td>

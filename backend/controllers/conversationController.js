@@ -16,8 +16,29 @@ exports.list = wrap(async (req, res) => {
     Conversation.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(pageSize).lean(),
     Conversation.countDocuments(filter)
   ]);
+  // Last message and message count for each conversation, and the colour of its agent
+  const ids = rows.map(c => c._id);
+  const [stats, agentRows] = await Promise.all([
+    Message.aggregate([
+      { $match: { conversationId: { $in: ids } } },
+      { $sort: { createdAt: 1 } },
+      { $group: { _id: '$conversationId', count: { $sum: 1 }, last: { $last: '$text' } } }
+    ]),
+    require('../models/Agent').find({ _id: { $in: rows.map(c => c.agentId) } }).select('color').lean()
+  ]);
+  const byConvo = new Map(stats.map(x => [String(x._id), x]));
+  const color = new Map(agentRows.map(a => [String(a._id), a.color]));
+
   res.json({
-    conversations: rows.map(c => ({ id: c._id, title: c.title, agentId: c.agentId, agentName: c.agentName, updatedAt: c.updatedAt })),
+    conversations: rows.map(c => {
+      const st = byConvo.get(String(c._id));
+      return {
+        id: c._id, title: c.title, agentId: c.agentId, agentName: c.agentName, updatedAt: c.updatedAt,
+        color: color.get(String(c.agentId)) || '#4338ca',
+        lastMessage: st ? String(st.last || '').slice(0, 140) : '',
+        messageCount: st ? st.count : 0
+      };
+    }),
     total, page, pages: pageCount(total, pageSize)
   });
 });

@@ -1,6 +1,10 @@
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { forkJoin, of, Subscription } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 
 interface Stat {
   label: string;
@@ -20,7 +24,7 @@ interface Announcement { title: string; text: string; date: string; }
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, OnDestroy {
   loading = true;
   today = new Date();
 
@@ -29,7 +33,11 @@ export class HomeComponent implements OnInit {
   agents: AgentCard[] = [];
   announcements: Announcement[] = [];
 
-  constructor(private router: Router) {}
+  loadError = '';
+  private userName = '';
+  private sub?: Subscription;
+
+  constructor(private router: Router, private api: ApiService) {}
 
   // ---- Session (swap for your RolesService when ready) --------------
   get role(): string {
@@ -37,7 +45,10 @@ export class HomeComponent implements OnInit {
   }
 
   get firstName(): string {
-    const name = (localStorage.getItem('name') || '').trim();
+    let name = this.userName;
+    if (!name) {
+      try { name = (JSON.parse(localStorage.getItem('profile') || '{}').name || '').trim(); } catch (e) { name = ''; }
+    }
     return name ? name.split(' ')[0] : 'there';
   }
 
@@ -55,42 +66,63 @@ export class HomeComponent implements OnInit {
     this.load();
   }
 
-  /**
-   * Replace the body of this method with your real calls, e.g.
-   *   GET /dashboard      -> stats, recentChats, agents
-   *   GET /announcements  -> announcements
-   * Then set this.loading = false when they finish (also on error).
-   */
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  /** GET /dashboard and GET /announcements */
   load(): void {
     this.loading = true;
+    this.loadError = '';
+    this.sub?.unsubscribe();
 
-    setTimeout(() => {
-      this.stats = [
-        { label: 'Chats this week',      value: 12,      icon: '💬', tone: 'teal',   route: '/conversations' },
-        { label: 'Agents available',     value: 3,       icon: '🤖', tone: 'indigo', route: '/chat' },
-        { label: 'Waiting for approval', value: 2,       icon: '✅', tone: 'amber',  route: '/approvals' },
-        { label: 'Cost this month',      value: '$14.20', icon: '💳', tone: 'green',  route: '/usage', roles: ['builder', 'admin'] },
-      ];
+    this.sub = forkJoin({
+      dash: this.api.dashboard(),
+      news: this.api.announcements().pipe(catchError(() => of({ announcements: [] })))
+    }).subscribe({
+      next: (r: any) => {
+        const d = r.dash || {};
+        const st = d.stats || {};
+        this.userName = (d.greeting && d.greeting.name) || '';
 
-      this.recentChats = [
-        { id: 'c1', title: "Summarise last week's enquiries", agent: 'Sales Assistant', time: '2 hours ago', color: '#14b8a6' },
-        { id: 'c2', title: 'Draft a reply to the supplier',  agent: 'Office Helper',   time: 'Yesterday',   color: '#4338ca' },
-        { id: 'c3', title: 'Find the leave policy',          agent: 'HR Guide',        time: 'Mon',         color: '#0f766e' },
-      ];
+        this.stats = [
+          { label: 'Chats this week',      value: st.chatsThisWeek || 0,      icon: '💬', tone: 'teal',   route: '/conversations' },
+          { label: 'Agents available',     value: st.agentsAvailable || 0,    icon: '🤖', tone: 'indigo', route: '/chat' },
+          { label: 'Waiting for approval', value: st.waitingForApproval || 0, icon: '✅', tone: 'amber',  route: '/approvals' },
+          { label: 'Cost this month',      value: '$' + Number(st.costThisMonth || 0).toFixed(2), icon: '💳', tone: 'green', route: '/usage', roles: ['builder', 'admin'] },
+        ];
 
-      this.agents = [
-        { id: 'a1', name: 'Sales Assistant', purpose: 'Answers questions about enquiries and leads.', color: '#14b8a6' },
-        { id: 'a2', name: 'Office Helper',   purpose: 'Drafts messages and summarises documents.',   color: '#4338ca' },
-        { id: 'a3', name: 'HR Guide',        purpose: 'Finds policies and answers staff questions.', color: '#0f766e' },
-      ];
+        this.recentChats = (d.recentConversations || []).map((c: any): RecentChat => ({
+          id: c.id, title: c.title, agent: c.agentName, color: c.color || '#4338ca', time: this.when(new Date(c.updatedAt))
+        }));
 
-      this.announcements = [
-        { title: 'Welcome to the workspace', text: 'Chat with an agent or ask a builder to create one for your team.', date: 'Today' },
-        { title: 'Approvals are on',         text: 'Actions that send or change data will ask for your yes or no first.', date: 'This week' },
-      ];
+        this.agents = (d.agents || []).map((a: any): AgentCard => ({
+          id: a.id, name: a.name, purpose: a.purpose || '', color: a.color || '#4338ca'
+        }));
 
-      this.loading = false;
-    }, 600);
+        this.announcements = ((r.news && r.news.announcements) || []).map((n: any): Announcement => ({
+          title: n.title, text: n.body, date: this.when(new Date(n.createdAt))
+        }));
+
+        this.loading = false;
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.loadError = e.message;
+      }
+    });
+  }
+
+  private when(d: Date): string {
+    const min = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (min < 1) { return 'Just now'; }
+    if (min < 60) { return min + (min === 1 ? ' minute ago' : ' minutes ago'); }
+    const hrs = Math.floor(min / 60);
+    if (hrs < 24) { return hrs + (hrs === 1 ? ' hour ago' : ' hours ago'); }
+    const days = Math.floor(hrs / 24);
+    if (days === 1) { return 'Yesterday'; }
+    if (days < 7) { return days + ' days ago'; }
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   // ---- Actions -------------------------------------------------------

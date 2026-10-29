@@ -1,10 +1,12 @@
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { ApiService } from 'src/app/core/api.service';
+import { ApiError } from 'src/app/core/models';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 type Role = 'member' | 'builder' | 'admin';
-type RunStatus = 'running' | 'waiting' | 'failed' | 'done';
+type RunStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped';
 type StepKind = 'model' | 'tool' | 'result' | 'approval';
 type StepStatus = 'ok' | 'failed' | 'waiting' | 'running';
 
@@ -34,7 +36,7 @@ interface RunStep {
   styleUrls: ['./runs.component.scss']
 })
 export class RunsComponent implements OnInit, OnDestroy {
-  readonly statusOptions: RunStatus[] = ['running', 'waiting', 'failed', 'done'];
+  readonly statusOptions: RunStatus[] = ['running', 'waiting', 'failed', 'done', 'stopped'];
 
   runs: RunRow[] = [];
 
@@ -61,7 +63,10 @@ export class RunsComponent implements OnInit, OnDestroy {
   private timers: number[] = [];
   private openToken = 0;      // ignores late answers for a run the person already closed
 
-  constructor(private router: Router) {}
+  private listSub?: Subscription;
+  private stepsSub?: Subscription;
+
+  constructor(private router: Router, private api: ApiService) {}
 
   // ---- Session ---------------------------------------------------------
   get signedIn(): boolean {
@@ -122,6 +127,8 @@ export class RunsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
+    this.listSub?.unsubscribe();
+    this.stepsSub?.unsubscribe();
     this.timers.forEach(id => window.clearTimeout(id));
     this.timers = [];
   }
@@ -132,27 +139,43 @@ export class RunsComponent implements OnInit, OnDestroy {
   }
 
   // ---- Loading the list ------------------------------------------------
-  /**
-   * REPLACE with GET /run/list.
-   * On { code: 'auth' } navigate to /account; on any other error set this.error and loading = false.
-   */
+  /** GET /runs/list (builders see their own agents' runs, admins see all) */
   load(): void {
     if (this.loading) { return; }
     this.loading = true;
     this.error = '';
 
-    this.later(() => {
-      this.runs = this.mockRuns();
-      this.loading = false;
-      if (this.page > this.totalPages) { this.page = this.totalPages; }
-    }, 600);
+    this.listSub?.unsubscribe();
+    this.listSub = this.api.get('/runs/list', { pageSize: 100 }).subscribe({
+      next: (r: any) => {
+        this.runs = (r.runs || []).map((x: any): RunRow => ({
+          id: x.id,
+          time: new Date(x.time),
+          agent: x.agentName,
+          person: x.person,
+          status: this.toStatus(x.status),
+          durationSec: (x.durationMs || 0) / 1000,
+          cost: x.cost || 0
+        }));
+        this.loading = false;
+        if (this.page > this.totalPages) { this.page = this.totalPages; }
+      },
+      error: (e: ApiError) => {
+        this.loading = false;
+        this.error = e.message;      // an expired session is handled by the interceptor
+      }
+    });
+  }
+
+  private toStatus(s: string): RunStatus {
+    return s === 'running' || s === 'waiting' || s === 'failed' || s === 'stopped' ? s : 'done';
   }
 
   // ---- Filters and paging ----------------------------------------------
   onSearch(value: string): void { this.search$.next(value || ''); }
 
   onStatus(value: string): void {
-    this.statusFilter = (value === 'running' || value === 'waiting' || value === 'failed' || value === 'done') ? value : '';
+    this.statusFilter = (value === 'running' || value === 'waiting' || value === 'failed' || value === 'done' || value === 'stopped') ? value : '';
     this.page = 1;
   }
 
@@ -186,18 +209,48 @@ export class RunsComponent implements OnInit, OnDestroy {
     if (this.selected && !this.stepsLoading) { this.loadSteps(this.selected); }
   }
 
-  /** REPLACE with GET /run/get?id=... (returns the steps of the run) */
+  /** GET /runs/get?id=... (the steps of the run) */
   private loadSteps(r: RunRow): void {
     const token = ++this.openToken;
     this.steps = [];
     this.stepsError = '';
     this.stepsLoading = true;
 
-    this.later(() => {
-      if (token !== this.openToken) { return; }
-      this.steps = this.buildSteps(r);
-      this.stepsLoading = false;
-    }, 450);
+    this.stepsSub?.unsubscribe();
+    this.stepsSub = this.api.run(r.id).subscribe({
+      next: (res: any) => {
+        if (token !== this.openToken) { return; }
+        const run = res.run || {};
+        const start = new Date(run.time).getTime();
+        const list = run.steps || [];
+
+        this.steps = list.map((st: any, i: number): RunStep => {
+          const failed = st.status === 'failed' || st.status === 'blocked' || st.status === 'rejected';
+          const status: StepStatus = failed ? 'failed' : st.status === 'waiting' ? 'waiting' : 'ok';
+          const at = st.time ? Math.max(0, (new Date(st.time).getTime() - start) / 1000) : 0;
+          return {
+            id: r.id + '-' + i,
+            kind: st.type === 'tool' ? 'tool' : st.type === 'approval' ? 'approval' : 'model',
+            title: st.name || 'Step',
+            detail: st.detail || undefined,
+            at,
+            status,
+            error: st.error || undefined
+          };
+        });
+
+        // a failure that has no step of its own is still shown
+        if (run.error && !this.steps.some(x => x.status === 'failed')) {
+          this.steps.push({ id: r.id + '-err', kind: 'result', title: 'The run stopped', at: r.durationSec, status: 'failed', error: run.error });
+        }
+        this.stepsLoading = false;
+      },
+      error: (e: ApiError) => {
+        if (token !== this.openToken) { return; }
+        this.stepsLoading = false;
+        this.stepsError = e.message;
+      }
+    });
   }
 
   // ---- Labels ----------------------------------------------------------
@@ -206,6 +259,7 @@ export class RunsComponent implements OnInit, OnDestroy {
       case 'running': return '⋯ Running';
       case 'waiting': return '⏳ Waiting for approval';
       case 'failed':  return '✖ Failed';
+      case 'stopped': return '■ Stopped';
       default:        return '✔ Done';
     }
   }
@@ -254,60 +308,5 @@ export class RunsComponent implements OnInit, OnDestroy {
       fn();
     }, ms);
     this.timers.push(id);
-  }
-
-  // ---- MOCK DATA (remove when connected to the backend) -------------------
-  private mockRuns(): RunRow[] {
-    const agents = ['Sales Assistant', 'HR Guide', 'Office Helper'];
-    const people = ['Ada Obi', 'Tunde Bello', 'Chika Eze', 'Ngozi Okafor'];
-    const statuses: RunStatus[] = ['done', 'done', 'done', 'failed', 'waiting', 'done', 'running', 'done', 'done', 'failed'];
-
-    const rows: RunRow[] = [];
-    for (let i = 0; i < 18; i++) {
-      rows.push({
-        id: 'r' + (i + 1),
-        time: new Date(Date.now() - (i * 95 + 7) * 60000),
-        agent: agents[i % agents.length],
-        person: people[(i * 3) % people.length],
-        status: statuses[i % statuses.length],
-        durationSec: ((i * 7) % 38) + 2.4,
-        cost: 0.012 + ((i * 17) % 40) / 1000
-      });
-    }
-    return rows;
-  }
-
-  private buildSteps(r: RunRow): RunStep[] {
-    const total = r.durationSec;
-    const steps: RunStep[] = [
-      { id: r.id + '-1', kind: 'model', title: 'Read the question and chose what to do', detail: 'The model planned the answer.', at: 0, status: 'ok' },
-      { id: r.id + '-2', kind: 'tool', title: 'Search the knowledge base', detail: 'Looked through the documents attached to ' + r.agent + '.', at: Math.min(0.8, total), status: 'ok' },
-    ];
-
-    if (r.status === 'failed') {
-      steps.push({
-        id: r.id + '-3', kind: 'result', title: 'Read the database', at: total, status: 'failed',
-        error: 'The database did not answer in time (timeout after 30 s).'
-      });
-      return steps;
-    }
-
-    steps.push({ id: r.id + '-3', kind: 'result', title: 'Found 2 matching passages', detail: 'Passages were passed back to the model.', at: Math.min(2.1, total), status: 'ok' });
-
-    if (r.status === 'waiting') {
-      steps.push({
-        id: r.id + '-4', kind: 'approval', title: 'Send the email "Following up on your enquiry" to the customer.',
-        detail: 'The run is paused until someone approves or rejects this action.', at: total, status: 'waiting'
-      });
-      return steps;
-    }
-
-    if (r.status === 'running') {
-      steps.push({ id: r.id + '-4', kind: 'model', title: 'Writing the answer', at: total, status: 'running' });
-      return steps;
-    }
-
-    steps.push({ id: r.id + '-4', kind: 'model', title: 'Wrote the answer', detail: 'The answer was streamed to the person.', at: total, status: 'ok' });
-    return steps;
   }
 }

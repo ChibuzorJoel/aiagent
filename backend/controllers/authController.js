@@ -80,6 +80,9 @@ exports.verifyCode = async (req, res, next) => {
       return res.status(403).json({ code: 'deactivated', message: 'This account has been deactivated.' });
     }
 
+    user.lastLoginAt = new Date();
+    await user.save();
+
     const token = jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
     await logAudit({ user, action: 'sign_in', target: '-', details: 'Signed in with an e-mail code.' });
